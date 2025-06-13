@@ -521,6 +521,15 @@ const updatedPolygons = generateRoots(polygons);
             }
         }
 
+        class division{
+            constructor(region,province){
+            this.region=region
+            this.province=province
+            }
+        }
+
+        west_osokorki_div=new division(8,2)
+        
         function setInitialView() {
             scale = minZoom;
             const mapRenderWidth = naturalWidth * scale;
@@ -530,7 +539,11 @@ const updatedPolygons = generateRoots(polygons);
             applyConstraintsAndDraw();
         }
 
-        
+       let divarr = new Array()
+       
+       divarr.push(west_osokorki_div)
+
+
 
         mapImage.onload = () => {
             naturalWidth = mapImage.naturalWidth;
@@ -650,8 +663,19 @@ const updatedPolygons = generateRoots(polygons);
                 }
             }
 
+            divarr.forEach(div => {
+                const targetProvince = polygons[div.region].provinces[div.province];
+                const selectedCenter = getPolygonCenter(targetProvince.points);
+                ctx.beginPath()
+                ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI)
+                ctx.closePath()
+                ctx.fill()
+                ctx.stroke()
+            });
+
             ctx.restore();
             zoomLevelSpan.textContent = Math.round(scale * 100);
+
         }
 
 
