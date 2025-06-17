@@ -646,10 +646,16 @@ const updatedPolygons = generateRoots(polygons);
                 ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI); // Scale radius
                 ctx.closePath();
                 ctx.fill();
-                
+                let res = false
+              
+            divarr.forEach(div => {
+                if(div.region== selectedPolygonRegionIndex && div.province==selectedPolygonProvinceIndex){
+                    res=true
+                }
+            });
 
                 // Draw arrows to connected provinces
-                if (selectedPolygon.roots && selectedPolygon.roots.length > 0) {
+                if (res && selectedPolygon.roots && selectedPolygon.roots.length > 0) {
                     selectedPolygon.roots.forEach(root => {
                         // Ensure the root definition is valid
                         if (polygons[root.region] && polygons[root.region].provinces[root.province]) {
