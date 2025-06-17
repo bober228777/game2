@@ -590,6 +590,8 @@ const updatedPolygons = generateRoots(polygons);
             ctx.stroke();
         }
 
+        let act = false
+
 
         function drawMap() {
             if (!mapImage.complete || naturalWidth === 0) return;
@@ -638,21 +640,38 @@ const updatedPolygons = generateRoots(polygons);
                 ctx.strokeStyle = regionOfSelected.selectedBorderColor;
                 ctx.lineWidth = 3 / scale;
                 ctx.stroke();
-
-                // Draw center marker for selected polygon
-                const selectedCenter = getPolygonCenter(selectedPolygon.points);
-                ctx.beginPath();
-                ctx.fillStyle = "red"; // Color of the center circle
-                ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI); // Scale radius
-                ctx.closePath();
-                ctx.fill();
-                let res = false
-              
-            divarr.forEach(div => {
-                if(div.region== selectedPolygonRegionIndex && div.province==selectedPolygonProvinceIndex){
-                    res=true
+                let curProvince = polygons[divarr[0].region].provinces[divarr[0].province]
+                let canGo = false
+                curProvince.roots.forEach(root => 
+                {
+                    if (root.region == selectedPolygonRegionIndex && root.province == selectedPolygonProvinceIndex)
+                    {
+                        canGo = true
+                    }
                 }
-            });
+                )
+                if (canGo)
+                {
+                    divarr[0].region = selectedPolygonRegionIndex;
+                    divarr[0].province = selectedPolygonProvinceIndex; 
+                }
+                let res = false
+                const selectedCenter = getPolygonCenter(selectedPolygon.points);
+                divarr.forEach(div => {
+                    if(div.region== selectedPolygonRegionIndex && div.province==selectedPolygonProvinceIndex){
+                        res=true
+                    }
+                });
+                console.log(act)
+                act = false;
+                if (res){
+                    ctx.beginPath();
+                    ctx.fillStyle = "red"; // Color of the center circle
+                    ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI); // Scale radius
+                    ctx.closePath();
+                    ctx.fill();
+                    act = true
+                    }
 
                 // Draw arrows to connected provinces
                 if (res && selectedPolygon.roots && selectedPolygon.roots.length > 0) {
