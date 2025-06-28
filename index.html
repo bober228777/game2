@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hearts of Golzov I</title>
+    <title>Hearts of Golzov I - Battle System</title>
     <style>
         body {
             margin: 0;
@@ -19,6 +19,7 @@
         }
 
         #map-controls {
+            height: 65px;
             margin-bottom: 10px;
             padding: 10px;
             background-color: rgba(0,0,0,0.3);
@@ -65,7 +66,9 @@
 
     <div id="map-controls">
         Zoom: <span id="zoom-level">100</span>% <br>
-        Selected Region: <span id="selected-region-info">-</span>
+        Selected Region: <span id="selected-region-info">-</span><br>
+        <span id="instructions" style="color: #ffc107;">Instructions: Select a unit, then click an adjacent province to move or attack.</span><br>
+        Time: <span id="time">1.1.2025</span>
     </div>
 
     <div id="map-viewport">
@@ -73,6 +76,9 @@
     </div>
 
     <script>
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
         const viewport = document.getElementById('map-viewport');
         const canvas = document.getElementById('map-canvas');
         const ctx = canvas.getContext('2d');
@@ -83,414 +89,375 @@
         const mapImage = new Image();
         const imageSrc = './final_large_map.png'; // Make sure this path is correct
 
-const polygons = [
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
+        const polygons = [
             {
-                "id": "West_osokorki_1",
-                "name": "Західні Осокорки - Північний Захід",
-                "points": [
-                    { "x": 1457, "y": 1337 }, { "x": 1525, "y": 1319 }, { "x": 1525, "y": 1380 }, { "x": 1477, "y": 1380 }
-                ],
-                "roots":[ // Connections from this province (will be regenerated)
-                    { "region": 2, "province": 2 }, // to Sth_pozniaki_3
-                    { "region": 0, "province": 1 }, // to West_osokorki_2
-                    { "region": 0, "province": 2 }  // to West_osokorki_3
-                ]
-            },
-            {
-                "id": "West_osokorki_2",
-                "name": "Західні Осокорки - Північний Схід",
-                "points": [
-                    { "x": 1525, "y": 1319 }, { "x": 1555, "y": 1311 }, { "x": 1572, "y": 1380 }, { "x": 1525, "y": 1380 }
-                ],
-            },
-            {
-                "id": "West_osokorki_3",
-                "name": "Західні Осокорки - Південний Захід",
-                "points": [
-                    { "x": 1477, "y": 1380 }, { "x": 1525, "y": 1380 }, { "x": 1525, "y": 1432 }, { "x": 1502, "y": 1435 }
-                ]
-            },
-            {
-                "id": "West_osokorki_4",
-                "name": "Західні Осокорки - Південний Схід",
-                "points": [
-                    { "x": 1525, "y": 1380 }, { "x": 1572, "y": 1380 }, { "x": 1583, "y": 1423 }, { "x": 1525, "y": 1432 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)", // Different color for variety, e.g., blue
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 50, 255, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "East_osokorki_1",
-                "name": "Східні Осокорки - Північний Захід",
-                "points": [
-                    { "x": 1555, "y": 1311 }, { "x": 1630, "y": 1291 }, { "x": 1630, "y": 1340 }, { "x": 1562, "y": 1340 }
-                ]
-            },
-            {
-                "id": "East_osokorki_2",
-                "name": "Східні Осокорки - Північний Схід",
-                "points": [
-                    { "x": 1630, "y": 1291 }, { "x": 1669, "y": 1280 }, { "x": 1675, "y": 1340 }, { "x": 1630, "y": 1340 }
-                ]
-            },
-            {
-                "id": "East_osokorki_3",
-                "name": "Східні Осокорки - Південний Захід",
-                "points": [
-                    { "x": 1562, "y": 1340 }, { "x": 1630, "y": 1340 }, { "x": 1630, "y": 1417 }, { "x": 1583, "y": 1423 }
-                ]
-            },
-            {
-                "id": "East_osokorki_4",
-                "name": "Східні Осокорки - Південний Схід",
-                "points": [
-                    { "x": 1630, "y": 1340 }, { "x": 1675, "y": 1340 }, { "x": 1683, "y": 1410 }, { "x": 1630, "y": 1417 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(255, 0, 0, 0.35)", // Different color for variety, e.g., red
-        "borderColor": "black",
-        "selectedColor": "rgba(255, 50, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Sth_pozniaki_1",
-                "name": "Південі Позняки - Північний Захід",
-                "points": [
-                    { "x": 1444, "y": 1249 }, { "x": 1550, "y": 1206 }, { "x": 1550, "y": 1260 }, { "x": 1446, "y": 1260 }
-                ]
-            },
-            {
-                "id": "Sth_pozniaki_2",
-                "name": "Південі Позняки - Північний Схід",
-                "points": [
-                    { "x": 1550, "y": 1206 }, { "x": 1627, "y": 1174 }, { "x": 1661, "y": 1260 }, { "x": 1550, "y": 1260 }
-                ]
-            },
-            {
-                "id": "Sth_pozniaki_3",
-                "name": "Південі Позняки - Південний Захід",
-                "points": [
-                    { "x": 1446, "y": 1260 }, { "x": 1550, "y": 1260 }, { "x": 1550, "y": 1312 }, { "x": 1457, "y": 1337 }
-                ],
-            },
-            {
-                "id": "Sth_pozniaki_4",
-                "name": "Південі Позняки - Південний Схід",
-                "points": [
-                    { "x": 1550, "y": 1260 }, { "x": 1661, "y": 1260 }, { "x": 1669, "y": 1280 }, { "x": 1550, "y": 1312 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Nrth_pozniaki_1",
-                "name": "Північні Позняки - Сектор B",
-                "points": [
-                    { "x": 1425, "y": 1150 }, { "x": 1425, "y": 1088 }, { "x": 1469, "y": 1068 }, { "x": 1499, "y": 1150 }
-                ]
-            },
-            {
-                "id": "Nrth_pozniaki_2",
-                "name": "Північні Позняки - Сектор AE",
-                "points": [
-                    { "x": 1425, "y": 1150 }, { "x": 1499, "y": 1150 }, { "x": 1524, "y": 1216 }, { "x": 1444, "y": 1249 }, { "x": 1425, "y": 1244 }
-                ]
-            },
-            {
-                "id": "Nrth_pozniaki_3",
-                "name": "Північні Позняки - Сектор D",
-                "points": [
-                    { "x": 1425, "y": 1150 }, { "x": 1425, "y": 1244 }, { "x": 1361, "y": 1226 }, { "x": 1328, "y": 1150 }
-                ]
-            },
-            {
-                "id": "Nrth_pozniaki_4",
-                "name": "Північні Позняки - Сектор C",
-                "points": [
-                    { "x": 1425, "y": 1150 }, { "x": 1328, "y": 1150 }, { "x": 1321, "y": 1134 }, { "x": 1425, "y": 1088 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Est_pozniaki_1",
-                "name": "Східні Позняки - Сектор CB",
-                "points": [
-                    { "x": 1575, "y": 1120 }, { "x": 1575, "y": 1035 }, { "x": 1572, "y": 1033 }, { "x": 1469, "y": 1068 }, { "x": 1488, "y": 1120 }
-                ]
-            },
-            {
-                "id": "Est_pozniaki_2",
-                "name": "Східні Позняки - Сектор A",
-                "points": [
-                    { "x": 1575, "y": 1120 }, { "x": 1488, "y": 1120 }, { "x": 1524, "y": 1216 }, { "x": 1575, "y": 1195 }
-                ]
-            },
-            {
-                "id": "Est_pozniaki_3",
-                "name": "Східні Позняки - Сектор E",
-                "points": [
-                    { "x": 1575, "y": 1120 }, { "x": 1575, "y": 1195 }, { "x": 1627, "y": 1174 }, { "x": 1683, "y": 1120 }
-                ]
-            },
-            {
-                "id": "Est_pozniaki_4",
-                "name": "Східні Позняки - Сектор D",
-                "points": [
-                    { "x": 1575, "y": 1120 }, { "x": 1683, "y": 1120 }, { "x": 1685, "y": 1118 }, { "x": 1575, "y": 1035 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Berznaki_1",
-                "name": "Березняки - Сектор D",
-                "points": [
-                    { "x": 1395, "y": 1040 }, { "x": 1395, "y": 968 }, { "x": 1435, "y": 944 }, { "x": 1469, "y": 1040 }
-                ]
-            },
-            {
-                "id": "Berznaki_2",
-                "name": "Березняки - Сектор EF",
-                "points": [
-                    { "x": 1395, "y": 1040 }, { "x": 1469, "y": 1040 }, { "x": 1471, "y": 1045 }, { "x": 1469, "y": 1068 }, { "x": 1395, "y": 1101 }
-                ]
-            },
-            {
-                "id": "Berznaki_3",
-                "name": "Березняки - Сектор AB",
-                "points": [
-                    { "x": 1395, "y": 1040 }, { "x": 1395, "y": 1101 }, { "x": 1321, "y": 1134 }, { "x": 1316, "y": 1114 }, { "x": 1316, "y": 1040 }
-                ]
-            },
-            {
-                "id": "Berznaki_4",
-                "name": "Березняки - Сектор C",
-                "points": [
-                    { "x": 1395, "y": 1040 }, { "x": 1316, "y": 1040 }, { "x": 1316, "y": 1014 }, { "x": 1395, "y": 968 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Kharkiv_mas_1",
-                "name": "Харківський масив - Сектор BC",
-                "points": [
-                    { "x": 1735, "y": 1200 }, { "x": 1735, "y": 1267 }, { "x": 1768, "y": 1261 }, { "x": 1843, "y": 1270 }, { "x": 1770, "y": 1200 }
-                ]
-            },
-            {
-                "id": "Kharkiv_mas_2",
-                "name": "Харківський масив - Сектор D",
-                "points": [
-                    { "x": 1735, "y": 1200 }, { "x": 1770, "y": 1200 },  { "x": 1735, "y": 1166 }
-                ]
-            },
-            {
-                "id": "Kharkiv_mas_3",
-                "name": "Харківський масив - Сектор E",
-                "points": [
-                    { "x": 1735, "y": 1200 },  { "x": 1735, "y": 1166 }, { "x": 1685, "y": 1118 }, { "x": 1627, "y": 1174 }, { "x": 1637, "y": 1200 },
-                ]
-            },
-            {
-                "id": "Kharkiv_mas_4",
-                "name": "Харківський масив - Сектор A",
-                "points": [
-                    { "x": 1735, "y": 1200 }, { "x": 1637, "y": 1200 }, { "x": 1669, "y": 1280 }, { "x": 1735, "y": 1267 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "Darnica_1",
-                "name": "Дарниця - Сектор BA",
-                "points": [
-                    { "x": 1695, "y": 1060 }, { "x": 1695, "y": 1013 }, { "x": 1660, "y": 1003 }, { "x": 1572, "y": 1033 }, { "x": 1608, "y": 1060 }
-                ]
-            },
-            {
-                "id": "Darnica_2",
-                "name": "Дарниця - Сектор F",
-                "points": [
-                    { "x": 1695, "y": 1060 }, { "x": 1608, "y": 1060 }, { "x": 1685, "y": 1118 }, { "x": 1695, "y": 1107 }
-                ]
-            },
-            {
-                "id": "Darnica_3",
-                "name": "Дарниця - Сектор ED",
-                "points": [
-                    { "x": 1695, "y": 1060 }, { "x": 1695, "y": 1107 }, { "x": 1701, "y": 1100 }, { "x": 1749, "y": 1078 }, { "x": 1787, "y": 1060 }
-                ]
-            },
-            {
-                "id": "Darnica_4",
-                "name": "Дарниця - Сектор C",
-                "points": [
-                    { "x": 1695, "y": 1060 }, { "x": 1787, "y": 1060 }, { "x": 1817, "y": 1046 }, { "x": 1695, "y": 1013 }
-                ]
-            }
-        ]
-    },
-    {
-        "color": "rgba(0, 255, 0, 0.35)",
-        "borderColor": "black",
-        "selectedColor": "rgba(50, 255, 50, 0.5)",
-        "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
-        "provinces": [
-            {
-                "id": "id_par_slav_1",
-                "name": "Парк партизанської слави - Сектор CBA",
-                "points": [
-                    { "x": 1820, "y": 1180 }, { "x": 1820, "y": 1107 }, { "x": 1780, "y": 1087 }, { "x": 1701, "y": 1100 }, { "x": 1685, "y": 1118 }, { "x": 1749, "y": 1180 }
-                ]
-            },
-            {
-                "id": "id_par_slav_2",
-                "name": "Парк партизанської слави - Сектор D",
-                "points": [
-                    { "x": 1820, "y": 1180 }, { "x": 1952, "y": 1180 }, { "x": 1958, "y": 1175 }, { "x": 1820, "y": 1107 }
-                ]
-            },
-            {
-                "id": "id_par_slav_3",
-                "name": "Парк партизанської слави - Сектор E",
-                "points": [
-                    { "x": 1820, "y": 1180 }, { "x": 1820, "y": 1248 }, { "x": 1843, "y": 1270 }, { "x": 1952, "y": 1180 }
-                ]
-            },
-            {
-                "id": "id_par_slav_4",
-                "name": "Парк партизанської слави - Сектор EA (triangle)",
-                "points": [
-                    { "x": 1820, "y": 1180 }, { "x": 1749, "y": 1180 }, { "x": 1820, "y": 1248 }
-                ]
-            }
-        ]
-    }
-];
-
-// Helper function to check if two points are identical
-function pointsAreEqual(p1, p2) {
-    return p1.x === p2.x && p1.y === p2.y;
-}
-
-// Helper function to check if two provinces (via their points arrays) are neighbors
-// A neighbor is defined as sharing at least one common coordinate point.
-function areNeighbors(points1, points2) {
-    for (let i = 0; i < points1.length; i++) {
-        for (let j = 0; j < points2.length; j++) {
-            if (pointsAreEqual(points1[i], points2[j])) {
-                return true; // Found at least one common point, they are neighbors
-            }
-        }
-    }
-    return false; // No common points found
-}
-
-/**
- * Populates the 'roots' array for every province based on shared border points.
- *
- * @param {Array<Object>} polygonsData - The array of region objects, each containing provinces.
- * @returns {Array<Object>} The modified polygonsData with 'roots' added/updated for all provinces.
- */
-function generateRoots(polygonsData) {
-    // Iterate through each region
-    for (let i = 0; i < polygonsData.length; i++) {
-        const region1 = polygonsData[i];
-
-        // Iterate through each province within the current region
-        for (let j = 0; j < region1.provinces.length; j++) {
-            const province1 = region1.provinces[j];
-
-            // Initialize or clear the roots array for the current province.
-            // This ensures we regenerate roots from scratch and don't accumulate
-            // if the function is called multiple times.
-            province1.roots = [];
-
-            // Compare province1 with all other provinces to find neighbors
-            // Iterate through all regions again (including the current one)
-            for (let k = 0; k < polygonsData.length; k++) {
-                const region2 = polygonsData[k];
-
-                // Iterate through each province within the second region
-                for (let l = 0; l < region2.provinces.length; l++) {
-                    const province2 = region2.provinces[l];
-
-                    // Skip self-comparison (a province cannot be its own neighbor)
-                    if (i === k && j === l) {
-                        continue;
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "West_osokorki_1",
+                        "name": "Західні Осокорки - Північний Захід",
+                        "points": [
+                            { "x": 1457, "y": 1337 }, { "x": 1525, "y": 1319 }, { "x": 1525, "y": 1380 }, { "x": 1477, "y": 1380 }
+                        ]
+                    },
+                    {
+                        "id": "West_osokorki_2",
+                        "name": "Західні Осокорки - Північний Схід",
+                        "points": [
+                            { "x": 1525, "y": 1319 }, { "x": 1555, "y": 1311 }, { "x": 1572, "y": 1380 }, { "x": 1525, "y": 1380 }
+                        ],
+                    },
+                    {
+                        "id": "West_osokorki_3",
+                        "name": "Західні Осокорки - Південний Захід",
+                        "points": [
+                            { "x": 1477, "y": 1380 }, { "x": 1525, "y": 1380 }, { "x": 1525, "y": 1432 }, { "x": 1502, "y": 1435 }
+                        ]
+                    },
+                    {
+                        "id": "West_osokorki_4",
+                        "name": "Західні Осокорки - Південний Схід",
+                        "points": [
+                            { "x": 1525, "y": 1380 }, { "x": 1572, "y": 1380 }, { "x": 1583, "y": 1423 }, { "x": 1525, "y": 1432 }
+                        ]
                     }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)", // Different color for variety, e.g., blue
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 50, 255, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "East_osokorki_1",
+                        "name": "Східні Осокорки - Північний Захід",
+                        "points": [
+                            { "x": 1555, "y": 1311 }, { "x": 1630, "y": 1291 }, { "x": 1630, "y": 1340 }, { "x": 1562, "y": 1340 }
+                        ]
+                    },
+                    {
+                        "id": "East_osokorki_2",
+                        "name": "Східні Осокорки - Північний Схід",
+                        "points": [
+                            { "x": 1630, "y": 1291 }, { "x": 1669, "y": 1280 }, { "x": 1675, "y": 1340 }, { "x": 1630, "y": 1340 }
+                        ]
+                    },
+                    {
+                        "id": "East_osokorki_3",
+                        "name": "Східні Осокорки - Південний Захід",
+                        "points": [
+                            { "x": 1562, "y": 1340 }, { "x": 1630, "y": 1340 }, { "x": 1630, "y": 1417 }, { "x": 1583, "y": 1423 }
+                        ]
+                    },
+                    {
+                        "id": "East_osokorki_4",
+                        "name": "Східні Осокорки - Південний Схід",
+                        "points": [
+                            { "x": 1630, "y": 1340 }, { "x": 1675, "y": 1340 }, { "x": 1683, "y": 1410 }, { "x": 1630, "y": 1417 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(255, 0, 0, 0.35)", // Different color for variety, e.g., red
+                "borderColor": "black",
+                "selectedColor": "rgba(255, 50, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Sth_pozniaki_1",
+                        "name": "Південі Позняки - Північний Захід",
+                        "points": [
+                            { "x": 1444, "y": 1249 }, { "x": 1550, "y": 1206 }, { "x": 1550, "y": 1260 }, { "x": 1446, "y": 1260 }
+                        ]
+                    },
+                    {
+                        "id": "Sth_pozniaki_2",
+                        "name": "Південі Позняки - Північний Схід",
+                        "points": [
+                            { "x": 1550, "y": 1206 }, { "x": 1627, "y": 1174 }, { "x": 1661, "y": 1260 }, { "x": 1550, "y": 1260 }
+                        ]
+                    },
+                    {
+                        "id": "Sth_pozniaki_3",
+                        "name": "Південі Позняки - Південний Захід",
+                        "points": [
+                            { "x": 1446, "y": 1260 }, { "x": 1550, "y": 1260 }, { "x": 1550, "y": 1312 }, { "x": 1457, "y": 1337 }
+                        ],
+                    },
+                    {
+                        "id": "Sth_pozniaki_4",
+                        "name": "Південі Позняки - Південний Схід",
+                        "points": [
+                            { "x": 1550, "y": 1260 }, { "x": 1661, "y": 1260 }, { "x": 1669, "y": 1280 }, { "x": 1550, "y": 1312 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Nrth_pozniaki_1",
+                        "name": "Північні Позняки - Сектор B",
+                        "points": [
+                            { "x": 1425, "y": 1150 }, { "x": 1425, "y": 1088 }, { "x": 1469, "y": 1068 }, { "x": 1499, "y": 1150 }
+                        ]
+                    },
+                    {
+                        "id": "Nrth_pozniaki_2",
+                        "name": "Північні Позняки - Сектор AE",
+                        "points": [
+                            { "x": 1425, "y": 1150 }, { "x": 1499, "y": 1150 }, { "x": 1524, "y": 1216 }, { "x": 1444, "y": 1249 }, { "x": 1425, "y": 1244 }
+                        ]
+                    },
+                    {
+                        "id": "Nrth_pozniaki_3",
+                        "name": "Північні Позняки - Сектор D",
+                        "points": [
+                            { "x": 1425, "y": 1150 }, { "x": 1425, "y": 1244 }, { "x": 1361, "y": 1226 }, { "x": 1328, "y": 1150 }
+                        ]
+                    },
+                    {
+                        "id": "Nrth_pozniaki_4",
+                        "name": "Північні Позняки - Сектор C",
+                        "points": [
+                            { "x": 1425, "y": 1150 }, { "x": 1328, "y": 1150 }, { "x": 1321, "y": 1134 }, { "x": 1425, "y": 1088 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Est_pozniaki_1",
+                        "name": "Східні Позняки - Сектор CB",
+                        "points": [
+                            { "x": 1575, "y": 1120 }, { "x": 1575, "y": 1035 }, { "x": 1572, "y": 1033 }, { "x": 1469, "y": 1068 }, { "x": 1488, "y": 1120 }
+                        ]
+                    },
+                    {
+                        "id": "Est_pozniaki_2",
+                        "name": "Східні Позняки - Сектор A",
+                        "points": [
+                            { "x": 1575, "y": 1120 }, { "x": 1488, "y": 1120 }, { "x": 1524, "y": 1216 }, { "x": 1575, "y": 1195 }
+                        ]
+                    },
+                    {
+                        "id": "Est_pozniaki_3",
+                        "name": "Східні Позняки - Сектор E",
+                        "points": [
+                            { "x": 1575, "y": 1120 }, { "x": 1575, "y": 1195 }, { "x": 1627, "y": 1174 }, { "x": 1683, "y": 1120 }
+                        ]
+                    },
+                    {
+                        "id": "Est_pozniaki_4",
+                        "name": "Східні Позняки - Сектор D",
+                        "points": [
+                            { "x": 1575, "y": 1120 }, { "x": 1683, "y": 1120 }, { "x": 1685, "y": 1118 }, { "x": 1575, "y": 1035 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Berznaki_1",
+                        "name": "Березняки - Сектор D",
+                        "points": [
+                            { "x": 1395, "y": 1040 }, { "x": 1395, "y": 968 }, { "x": 1435, "y": 944 }, { "x": 1469, "y": 1040 }
+                        ]
+                    },
+                    {
+                        "id": "Berznaki_2",
+                        "name": "Березняки - Сектор EF",
+                        "points": [
+                            { "x": 1395, "y": 1040 }, { "x": 1469, "y": 1040 }, { "x": 1471, "y": 1045 }, { "x": 1469, "y": 1068 }, { "x": 1395, "y": 1101 }
+                        ]
+                    },
+                    {
+                        "id": "Berznaki_3",
+                        "name": "Березняки - Сектор AB",
+                        "points": [
+                            { "x": 1395, "y": 1040 }, { "x": 1395, "y": 1101 }, { "x": 1321, "y": 1134 }, { "x": 1316, "y": 1114 }, { "x": 1316, "y": 1040 }
+                        ]
+                    },
+                    {
+                        "id": "Berznaki_4",
+                        "name": "Березняки - Сектор C",
+                        "points": [
+                            { "x": 1395, "y": 1040 }, { "x": 1316, "y": 1040 }, { "x": 1316, "y": 1014 }, { "x": 1395, "y": 968 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Kharkiv_mas_1",
+                        "name": "Харківський масив - Сектор BC",
+                        "points": [
+                            { "x": 1735, "y": 1200 }, { "x": 1735, "y": 1267 }, { "x": 1768, "y": 1261 }, { "x": 1843, "y": 1270 }, { "x": 1770, "y": 1200 }
+                        ]
+                    },
+                    {
+                        "id": "Kharkiv_mas_2",
+                        "name": "Харківський масив - Сектор D",
+                        "points": [
+                            { "x": 1735, "y": 1200 }, { "x": 1770, "y": 1200 },  { "x": 1735, "y": 1166 }
+                        ]
+                    },
+                    {
+                        "id": "Kharkiv_mas_3",
+                        "name": "Харківський масив - Сектор E",
+                        "points": [
+                            { "x": 1735, "y": 1200 },  { "x": 1735, "y": 1166 }, { "x": 1685, "y": 1118 }, { "x": 1627, "y": 1174 }, { "x": 1637, "y": 1200 },
+                        ]
+                    },
+                    {
+                        "id": "Kharkiv_mas_4",
+                        "name": "Харківський масив - Сектор A",
+                        "points": [
+                            { "x": 1735, "y": 1200 }, { "x": 1637, "y": 1200 }, { "x": 1669, "y": 1280 }, { "x": 1735, "y": 1267 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "Darnica_1",
+                        "name": "Дарниця - Сектор BA",
+                        "points": [
+                            { "x": 1695, "y": 1060 }, { "x": 1695, "y": 1013 }, { "x": 1660, "y": 1003 }, { "x": 1572, "y": 1033 }, { "x": 1608, "y": 1060 }
+                        ]
+                    },
+                    {
+                        "id": "Darnica_2",
+                        "name": "Дарниця - Сектор F",
+                        "points": [
+                            { "x": 1695, "y": 1060 }, { "x": 1608, "y": 1060 }, { "x": 1685, "y": 1118 }, { "x": 1695, "y": 1107 }
+                        ]
+                    },
+                    {
+                        "id": "Darnica_3",
+                        "name": "Дарниця - Сектор ED",
+                        "points": [
+                            { "x": 1695, "y": 1060 }, { "x": 1695, "y": 1107 }, { "x": 1701, "y": 1100 }, { "x": 1749, "y": 1078 }, { "x": 1787, "y": 1060 }
+                        ]
+                    },
+                    {
+                        "id": "Darnica_4",
+                        "name": "Дарниця - Сектор C",
+                        "points": [
+                            { "x": 1695, "y": 1060 }, { "x": 1787, "y": 1060 }, { "x": 1817, "y": 1046 }, { "x": 1695, "y": 1013 }
+                        ]
+                    }
+                ]
+            },
+            {
+                "color": "rgba(0, 255, 0, 0.35)",
+                "borderColor": "black",
+                "selectedColor": "rgba(50, 255, 50, 0.5)",
+                "selectedBorderColor": "rgba(255, 255, 255, 0.9)",
+                "provinces": [
+                    {
+                        "id": "id_par_slav_1",
+                        "name": "Парк партизанської слави - Сектор CBA",
+                        "points": [
+                            { "x": 1820, "y": 1180 }, { "x": 1820, "y": 1107 }, { "x": 1780, "y": 1087 }, { "x": 1701, "y": 1100 }, { "x": 1685, "y": 1118 }, { "x": 1749, "y": 1180 }
+                        ]
+                    },
+                    {
+                        "id": "id_par_slav_2",
+                        "name": "Парк партизанської слави - Сектор D",
+                        "points": [
+                            { "x": 1820, "y": 1180 }, { "x": 1952, "y": 1180 }, { "x": 1958, "y": 1175 }, { "x": 1820, "y": 1107 }
+                        ]
+                    },
+                    {
+                        "id": "id_par_slav_3",
+                        "name": "Парк партизанської слави - Сектор E",
+                        "points": [
+                            { "x": 1820, "y": 1180 }, { "x": 1820, "y": 1248 }, { "x": 1843, "y": 1270 }, { "x": 1952, "y": 1180 }
+                        ]
+                    },
+                    {
+                        "id": "id_par_slav_4",
+                        "name": "Парк партизанської слави - Сектор EA (triangle)",
+                        "points": [
+                            { "x": 1820, "y": 1180 }, { "x": 1749, "y": 1180 }, { "x": 1820, "y": 1248 }
+                        ]
+                    }
+                ]
+            }
+        ];
 
-                    // Check if province1 and province2 are neighbors by sharing common points
-                    if (areNeighbors(province1.points, province2.points)) {
-                        const newConnection = { region: k, province: l };
-
-                        // Before adding, check if this connection already exists in province1's roots.
-                        // This prevents duplicate entries in case multiple shared points are found
-                        // or if the loop structure implies redundant checks.
-                        const isDuplicate = province1.roots.some(
-                            root => root.region === newConnection.region && root.province === newConnection.province
-                        );
-
-                        if (!isDuplicate) {
-                            province1.roots.push(newConnection);
+        function pointsAreEqual(p1, p2) {
+            return p1.x === p2.x && p1.y === p2.y;
+        }
+       function areNeighbors(points1, points2) {
+            for (let i = 0; i < points1.length; i++) {
+                for (let j = 0; j < points2.length; j++) {
+                    if (pointsAreEqual(points1[i], points2[j])) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        function generateRoots(polygonsData) {
+            for (let i = 0; i < polygonsData.length; i++) {
+                const region1 = polygonsData[i];
+                for (let j = 0; j < region1.provinces.length; j++) {
+                    const province1 = region1.provinces[j];
+                    province1.roots = [];
+                    for (let k = 0; k < polygonsData.length; k++) {
+                        const region2 = polygonsData[k];
+                        for (let l = 0; l < region2.provinces.length; l++) {
+                            const province2 = region2.provinces[l];
+                            if (i === k && j === l) {
+                                continue;
+                            }
+                            if (areNeighbors(province1.points, province2.points)) {
+                                const newConnection = { region: k, province: l };
+                                const isDuplicate = province1.roots.some(
+                                    root => root.region === newConnection.region && root.province === newConnection.province
+                                );
+                                if (!isDuplicate) {
+                                    province1.roots.push(newConnection);
+                                }
+                            }
                         }
                     }
                 }
             }
+            return polygonsData;
         }
-    }
-    return polygonsData; // Return the modified polygons data
-}
-
-// --- Execute the function and display results ---
-const updatedPolygons = generateRoots(polygons);
+        const updatedPolygons = generateRoots(polygons);
 
         let selectedPolygon = null;
         let selectedPolygonRegionIndex = -1;
@@ -513,6 +480,22 @@ const updatedPolygons = generateRoots(polygons);
         let naturalWidth = 0;
         let naturalHeight = 0;
 
+
+        class Division {
+            constructor(region, province, countryId) {
+                this.region = region;
+                this.province = province;
+                this.countryId = countryId;
+            }
+        }
+        
+        let divarr = [];
+
+        divarr.push(new Division(8, 2, 1)); 
+        divarr.push(new Division(6, 0, 2));
+        let selectedDiv = -1;
+
+
         function resizeCanvas() {
             canvas.width = viewport.offsetWidth;
             canvas.height = viewport.offsetHeight;
@@ -521,15 +504,6 @@ const updatedPolygons = generateRoots(polygons);
             }
         }
 
-        class division{
-            constructor(region,province){
-            this.region=region
-            this.province=province
-            }
-        }
-
-        west_osokorki_div=new division(8,2)
-        
         function setInitialView() {
             scale = minZoom;
             const mapRenderWidth = naturalWidth * scale;
@@ -539,12 +513,6 @@ const updatedPolygons = generateRoots(polygons);
             applyConstraintsAndDraw();
         }
 
-       let divarr = new Array()
-       
-       divarr.push(west_osokorki_div)
-
-
-
         mapImage.onload = () => {
             naturalWidth = mapImage.naturalWidth;
             naturalHeight = mapImage.naturalHeight;
@@ -553,10 +521,9 @@ const updatedPolygons = generateRoots(polygons);
         };
         mapImage.src = imageSrc;
 
-
         function getPolygonCenter(polygonPoints) {
             if (!polygonPoints || polygonPoints.length === 0) {
-                return { x: 0, y: 0 }; // Should not happen with valid data
+                return { x: 0, y: 0 };
             }
             let sumX = 0;
             let sumY = 0;
@@ -570,30 +537,25 @@ const updatedPolygons = generateRoots(polygons);
             };
         }
 
-        function drawArrow(ctx, fromX, fromY, toX, toY, arrowHeadLength = 10) {
+         function drawArrow(ctx, fromX, fromY, toX, toY, arrowHeadLength = 10) {
             const dx = toX - fromX;
             const dy = toY - fromY;
             const angle = Math.atan2(dy, dx);
-            const actualArrowHeadLength = arrowHeadLength / scale; // Adjust head length for zoom
+            const actualArrowHeadLength = arrowHeadLength / scale;
 
             ctx.beginPath();
             ctx.moveTo(fromX, fromY);
             ctx.lineTo(toX, toY);
-
-            // Arrowhead
             ctx.lineTo(toX - actualArrowHeadLength * Math.cos(angle - Math.PI / 6), toY - actualArrowHeadLength * Math.sin(angle - Math.PI / 6));
             ctx.moveTo(toX, toY);
             ctx.lineTo(toX - actualArrowHeadLength * Math.cos(angle + Math.PI / 6), toY - actualArrowHeadLength * Math.sin(angle + Math.PI / 6));
 
-            ctx.strokeStyle = "yellow"; // Arrow color
-            ctx.lineWidth = 2 / scale;    // Arrow line width, adjusted for zoom
+            ctx.strokeStyle = "yellow";
+            ctx.lineWidth = 2 / scale;
             ctx.stroke();
         }
 
-        let act = false
-
-
-        function drawMap() {
+         function drawMap() {
             if (!mapImage.complete || naturalWidth === 0) return;
 
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -605,17 +567,14 @@ const updatedPolygons = generateRoots(polygons);
             ctx.imageSmoothingEnabled = scale > 1.0;
             ctx.drawImage(mapImage, 0, 0, naturalWidth, naturalHeight);
 
-            // Draw ALL polygons with their default style
-            polygons.forEach((regionData, regionIdx) => {
-                regionData.provinces.forEach((province, provinceIdx) => {
+            polygons.forEach((regionData) => {
+                regionData.provinces.forEach((province) => {
                     ctx.beginPath();
                     province.points.forEach((vertex, index) => {
                         if (index === 0) ctx.moveTo(vertex.x, vertex.y);
                         else ctx.lineTo(vertex.x, vertex.y);
                     });
                     ctx.closePath();
-
-                    // Use default colors, unless this is the selected polygon (handled later)
                     ctx.fillStyle = regionData.color;
                     ctx.fill();
                     ctx.strokeStyle = regionData.borderColor;
@@ -624,11 +583,8 @@ const updatedPolygons = generateRoots(polygons);
                 });
             });
 
-            // If a polygon is selected, redraw it with selected style and draw arrows/center
-            if (selectedPolygon && selectedPolygonRegionIndex !== -1 && selectedPolygonProvinceIndex !== -1) {
+            if (selectedPolygon) {
                 const regionOfSelected = polygons[selectedPolygonRegionIndex];
-
-                // Redraw selected polygon with highlight
                 ctx.beginPath();
                 selectedPolygon.points.forEach((vertex, index) => {
                     if (index === 0) ctx.moveTo(vertex.x, vertex.y);
@@ -640,71 +596,49 @@ const updatedPolygons = generateRoots(polygons);
                 ctx.strokeStyle = regionOfSelected.selectedBorderColor;
                 ctx.lineWidth = 3 / scale;
                 ctx.stroke();
-                let curProvince = polygons[divarr[0].region].provinces[divarr[0].province]
-                let canGo = false
-                curProvince.roots.forEach(root => 
-                {
-                    if (root.region == selectedPolygonRegionIndex && root.province == selectedPolygonProvinceIndex)
-                    {
-                        canGo = true
-                    }
-                }
-                )
-                if (canGo)
-                {
-                    divarr[0].region = selectedPolygonRegionIndex;
-                    divarr[0].province = selectedPolygonProvinceIndex; 
-                }
-                let res = false
-                const selectedCenter = getPolygonCenter(selectedPolygon.points);
-                divarr.forEach(div => {
-                    if(div.region== selectedPolygonRegionIndex && div.province==selectedPolygonProvinceIndex){
-                        res=true
-                    }
-                });
-                console.log(act)
-                act = false;
-                if (res){
-                    ctx.beginPath();
-                    ctx.fillStyle = "red"; // Color of the center circle
-                    ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI); // Scale radius
-                    ctx.closePath();
-                    ctx.fill();
-                    act = true
-                    }
 
-                // Draw arrows to connected provinces
-                if (res && selectedPolygon.roots && selectedPolygon.roots.length > 0) {
-                    selectedPolygon.roots.forEach(root => {
-                        // Ensure the root definition is valid
-                        if (polygons[root.region] && polygons[root.region].provinces[root.province]) {
-                            const targetProvince = polygons[root.region].provinces[root.province];
-                            const targetCenter = getPolygonCenter(targetProvince.points);
-                            drawArrow(ctx, selectedCenter.x, selectedCenter.y, targetCenter.x, targetCenter.y, 15); // Arrow head length (base size)
-                        } else {
-                            console.warn("Invalid root definition:", root, "for selected polygon:", selectedPolygon.id);
-                        }
-                    });
+                // If a division is selected, show its movement arrows
+                if (selectedDiv !== -1) {
+                    const selectedCenter = getPolygonCenter(selectedPolygon.points);
+                     if (selectedPolygon.roots && selectedPolygon.roots.length > 0) {
+                        selectedPolygon.roots.forEach(root => {
+                            if (polygons[root.region] && polygons[root.region].provinces[root.province]) {
+                                const targetProvince = polygons[root.region].provinces[root.province];
+                                const targetCenter = getPolygonCenter(targetProvince.points);
+                                drawArrow(ctx, selectedCenter.x, selectedCenter.y, targetCenter.x, targetCenter.y, 15);
+                            }
+                        });
+                    }
                 }
             }
-
+            
+            // Draw all divisions on the map with country-specific colors
             divarr.forEach(div => {
                 const targetProvince = polygons[div.region].provinces[div.province];
-                const selectedCenter = getPolygonCenter(targetProvince.points);
-                ctx.beginPath()
-                ctx.arc(selectedCenter.x, selectedCenter.y, 7 / scale, 0, 2 * Math.PI)
-                ctx.closePath()
-                ctx.fill()
-                ctx.stroke()
+                const center = getPolygonCenter(targetProvince.points);
+                ctx.beginPath();
+                ctx.arc(center.x, center.y, 8 / scale, 0, 2 * Math.PI);
+                
+                // Color based on countryId
+                if (div.countryId === 1) {
+                    ctx.fillStyle = "blue";
+                } else if (div.countryId === 2) {
+                    ctx.fillStyle = "red";
+                } else {
+                    ctx.fillStyle = "grey"; // Default color
+                }
+                
+                ctx.fill();
+                ctx.strokeStyle = "white";
+                ctx.lineWidth = 1.5 / scale;
+                ctx.stroke();
             });
 
             ctx.restore();
             zoomLevelSpan.textContent = Math.round(scale * 100);
-
         }
 
-
-        function applyConstraintsAndDraw() {
+             function applyConstraintsAndDraw() {
             const mapRenderWidth = naturalWidth * scale;
             const mapRenderHeight = naturalHeight * scale;
 
@@ -728,37 +662,76 @@ const updatedPolygons = generateRoots(polygons);
             for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
                 let xi = polygonPoints[i].x, yi = polygonPoints[i].y;
                 let xj = polygonPoints[j].x, yj = polygonPoints[j].y;
-
-                let intersect = ((yi > y) !== (yj > y))
-                    && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+                let intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
                 if (intersect) inside = !inside;
             }
             return inside;
         }
+
+        // --- NEW BATTLE SYSTEM HELPER FUNCTIONS ---
+
+        /**
+         * Finds the index of a division in the `divarr` at a given location.
+         * @returns {number} The index of the division, or -1 if not found.
+         */
+        function findDivisionAt(regionIdx, provinceIdx) {
+            return divarr.findIndex(div => div.region === regionIdx && div.province === provinceIdx);
+        }
+
+        /**
+         * Simulates a battle between two divisions.
+         * @param {number} attackerIndex - The index of the attacking division in `divarr`.
+         * @param {number} defenderIndex - The index of the defending division in `divarr`.
+         */
+        function startBattle(attackerIndex, defenderIndex) {
+            const attacker = divarr[attackerIndex];
+            const defender = divarr[defenderIndex];
+            const defenderProvinceName = polygons[defender.region].provinces[defender.province].name;
+
+            alert(`BATTLE! Country ${attacker.countryId} (Attacker) vs Country ${defender.countryId} (Defender) in ${defenderProvinceName}!`);
+
+            // Simple 50/50 chance for the battle outcome
+            if (Math.random() > 0.5) {
+                // Attacker wins
+                alert(`Country ${attacker.countryId} wins the battle! The defending division has been destroyed.`);
+                // Move the attacker to the defender's old position
+                attacker.region = defender.region;
+                attacker.province = defender.province;
+                // Remove the defender from the game
+                divarr.splice(defenderIndex, 1);
+            } else {
+                // Defender wins
+                alert(`Country ${defender.countryId} holds its ground! The attacking division has been destroyed.`);
+                // Remove the attacker from the game
+                divarr.splice(attackerIndex, 1);
+            }
+
+            // Reset selection state after the battle concludes
+            selectedDiv = -1;
+            selectedPolygon = null;
+            selectedPolygonRegionIndex = -1;
+            selectedPolygonProvinceIndex = -1;
+            selectedRegionInfoSpan.textContent = "-";
+        }
+
 
         viewport.addEventListener('wheel', (event) => {
             event.preventDefault();
             const rect = canvas.getBoundingClientRect();
             const mouseX_canvas = event.clientX - rect.left;
             const mouseY_canvas = event.clientY - rect.top;
-
             const mapX_before_zoom = (mouseX_canvas - panX) / scale;
             const mapY_before_zoom = (mouseY_canvas - panY) / scale;
-
             const delta = event.deltaY * zoomSensitivity;
             scale = Math.max(minZoom, Math.min(maxZoom, scale - delta));
-
             panX = mouseX_canvas - (mapX_before_zoom * scale);
             panY = mouseY_canvas - (mapY_before_zoom * scale);
-
             applyConstraintsAndDraw();
         });
 
         viewport.addEventListener('mousedown', (event) => {
-            if (event.button !== 0) return; // Only left click for panning
-            // Check if the click was on the canvas itself, not scrollbars if any
+            if (event.button !== 0) return;
             if (event.target !== canvas && event.target !== viewport) return;
-
             isPanning = true;
             viewport.classList.add('grabbing');
             startPanMouseX = event.clientX;
@@ -779,15 +752,7 @@ const updatedPolygons = generateRoots(polygons);
 
         document.addEventListener('mouseup', (event) => {
             if (event.button !== 0) return;
-             // Check if panning was active before trying to stop it
             if (isPanning) {
-                // If mouse moved significantly, it was a pan, not a click for selection
-                const dx = Math.abs(event.clientX - startPanMouseX);
-                const dy = Math.abs(event.clientY - startPanMouseY);
-                if (dx > 3 || dy > 3) { // Threshold to differentiate pan from click
-                    // This logic is tricky because click event fires after mouseup
-                    // We'll handle selection purely in the 'click' event for simplicity
-                }
                 isPanning = false;
                 viewport.classList.remove('grabbing');
             }
@@ -800,7 +765,7 @@ const updatedPolygons = generateRoots(polygons);
             }
         });
 
-        let panClickThreshold = 5; // pixels. If mouse moved less than this, it's a click not a pan.
+        let panClickThreshold = 5;
         let mousedownPos = {x:0, y:0};
 
         canvas.addEventListener('mousedown', (event) => {
@@ -808,27 +773,15 @@ const updatedPolygons = generateRoots(polygons);
             mousedownPos.y = event.clientY;
         });
 
-
+        // --- REVISED CLICK HANDLER WITH BATTLE LOGIC ---
         canvas.addEventListener('click', (event) => {
             if (!mapImage.complete || naturalWidth === 0) return;
-
-            // Check if it was a drag/pan or a genuine click
-            const dx = Math.abs(event.clientX - startPanMouseX);
-            const dy = Math.abs(event.clientY - startPanMouseY);
-             // Check if mouse moved significantly during the mousedown->mouseup sequence
-            const mouseMoveDist = Math.sqrt(
-                Math.pow(event.clientX - mousedownPos.x, 2) +
-                Math.pow(event.clientY - mousedownPos.y, 2)
-            );
-            if (mouseMoveDist > panClickThreshold) {
-                return; // It was a pan, not a click
-            }
-
+            const mouseMoveDist = Math.sqrt(Math.pow(event.clientX - mousedownPos.x, 2) + Math.pow(event.clientY - mousedownPos.y, 2));
+            if (mouseMoveDist > panClickThreshold) return; // It was a pan, not a click
 
             const rect = canvas.getBoundingClientRect();
             const clickX_canvas = event.clientX - rect.left;
             const clickY_canvas = event.clientY - rect.top;
-
             const mapClickX = (clickX_canvas - panX) / scale;
             const mapClickY = (clickY_canvas - panY) / scale;
             const clickPoint = { x: mapClickX, y: mapClickY };
@@ -837,7 +790,6 @@ const updatedPolygons = generateRoots(polygons);
             let foundRegionIndex = -1;
             let foundProvinceIndex = -1;
 
-            // Iterate from top-most drawn (last in array) to find a hit
             for (let i = polygons.length - 1; i >= 0; i--) {
                 for (let j = polygons[i].provinces.length - 1; j >= 0; j--) {
                     if (isPointInPolygon(clickPoint, polygons[i].provinces[j].points)) {
@@ -851,25 +803,67 @@ const updatedPolygons = generateRoots(polygons);
             }
 
             if (foundPolygon) {
-                // If clicking the same polygon, deselect it (optional behavior)
-                // if (selectedPolygon && selectedPolygon.id === foundPolygon.id) {
-                //     selectedPolygon = null;
-                //     selectedPolygonRegionIndex = -1;
-                //     selectedPolygonProvinceIndex = -1;
-                //     selectedRegionInfoSpan.textContent = "-";
-                // } else {
-                    selectedPolygon = foundPolygon;
-                    selectedPolygonRegionIndex = foundRegionIndex;
-                    selectedPolygonProvinceIndex = foundProvinceIndex;
-                    selectedRegionInfoSpan.textContent = foundPolygon.name;
-                // }
+                const targetRegion = foundRegionIndex;
+                const targetProvince = foundProvinceIndex;
+
+                // --- ACTION PHASE: A division is already selected and we're issuing a command ---
+                if (selectedDiv !== -1) {
+                    const attacker = divarr[selectedDiv];
+                    const currentProvince = polygons[attacker.region].provinces[attacker.province];
+
+                    const isAdjacent = currentProvince.roots.some(root => root.region === targetRegion && root.province === targetProvince);
+
+                    if (isAdjacent) {
+                        const defenderIndex = findDivisionAt(targetRegion, targetProvince);
+
+                        if (defenderIndex !== -1) {
+                            // Target province IS occupied
+                            const defender = divarr[defenderIndex];
+                            if (attacker.countryId !== defender.countryId) {
+                                // Occupied by an ENEMY. Start a battle.
+                                startBattle(selectedDiv, defenderIndex);
+                                drawMap();
+                                return;
+                            } else {
+                                // Occupied by a FRIEND. Block movement.
+                                alert("Cannot move into a space occupied by a friendly unit.");
+                                selectedDiv = -1; // Deselect current unit
+                            }
+                        } else {
+                            // Target province is EMPTY. Move the unit.
+                            attacker.region = targetRegion;
+                            attacker.province = targetProvince;
+                            selectedDiv = -1; // Deselect after moving
+                        }
+                    } else {
+                        // Clicked non-adjacent province. Just deselect the unit and proceed to selection phase.
+                        selectedDiv = -1;
+                    }
+                }
+
+
+
+                // --- SELECTION PHASE: No division was moving, so select what was clicked ---
+                const unitInClickedProvince = findDivisionAt(targetRegion, targetProvince);
+                if (unitInClickedProvince !== -1) {
+                    selectedDiv = unitInClickedProvince; // Select the unit
+                }
+
+                // Update the visual selection for the province
+                selectedPolygon = foundPolygon;
+                selectedPolygonRegionIndex = targetRegion;
+                selectedPolygonProvinceIndex = targetProvince;
+                selectedRegionInfoSpan.textContent = foundPolygon.name;
+
             } else {
+                // Clicked outside any province, deselect everything
                 selectedPolygon = null;
                 selectedPolygonRegionIndex = -1;
                 selectedPolygonProvinceIndex = -1;
                 selectedRegionInfoSpan.textContent = "-";
+                selectedDiv = -1;
             }
-            drawMap();
+            drawMap(); // Redraw the map with any changes
         });
 
         window.addEventListener('resize', () => {
@@ -880,6 +874,18 @@ const updatedPolygons = generateRoots(polygons);
         });
 
         resizeCanvas();
+        async function main(){
+            let now = new Date();
+            now.setFullYear(2025, 0, 0);
+            now.setMinutes(0, 0, 0)
+            while(true){
+                let hoursToAdd = 1;
+                await delay(500)
+                now.setHours(now.getHours() + hoursToAdd);
+                document.getElementById('time')
+                .innerHTML=now.toLocaleString()
+            }
+        } main()
     </script>
 
 </body>
