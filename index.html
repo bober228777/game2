@@ -345,8 +345,11 @@ function drawMap() {
             divarr.forEach(div => { if (div.isMoving) { const elapsed = currentGameTime - div.movementStartTime; if (elapsed >= div.movementDuration) { div.isMoving = false; disengageCombat(div); const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince); if (defenderIndex !== -1) { div.strength = 0; } else { div.region = div.targetRegion; div.province = div.targetProvince; } } } });
             divarr.forEach(div => { 
                 if(div.inCombat==false){
-                    console.log(polygons[div.region].provinces[div.province].color)
-                    
+                    if(div.countryId==1){
+                        polygons[div.region].provinces[div.province].color = 'rgba(0, 0, 255, 0.35)'
+                    }else{
+                        polygons[div.region].provinces[div.province].color = 'rgba(255, 0, 0, 0.35)'
+                    }                    
                 }
             }
         )
