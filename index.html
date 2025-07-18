@@ -340,9 +340,23 @@ function drawMap() {
                     else if (selectedDiv === deadIndex) selectedDiv = -1;
                 });
             }
-
+            
             // 3. Update Movement and Arrival
-            divarr.forEach(div => { if (div.isMoving) { const elapsed = currentGameTime - div.movementStartTime; if (elapsed >= div.movementDuration) { div.isMoving = false; disengageCombat(div); const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince); if (defenderIndex !== -1) { div.strength = 0; } else { div.region = div.targetRegion; div.province = div.targetProvince; } } } });
+           divarr.forEach(div =>{
+                if (div.isMoving) {
+                    const elapsed = currentGameTime - div.movementStartTime;
+                    if (elapsed >= div.movementDuration) {
+                    div.isMoving = false;
+                    const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
+                    if (defenderIndex !== -1) {
+                        div.strength = 0;
+                    } else {
+                        div.region = div.targetRegion;
+                        div.province = div.targetProvince;
+                    }
+                    }
+                }
+                });
             divarr.forEach(div => { 
                 if(div.inCombat==false){
                     if(div.countryId==1){
