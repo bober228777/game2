@@ -147,6 +147,7 @@
         }
         
         let divarr = [];
+        divarr.push(new Division(2, 2, 2));
         divarr.push(new Division(2, 3, 2)); // Red Unit
         divarr.push(new Division(0, 0, 1)); // Blue Unit
 
@@ -263,12 +264,15 @@ function drawMap() {
     divarr.forEach((div, i) => { 
         const center = div.getCurrentPosition(); 
         ctx.beginPath(); 
-        ctx.arc(center.x, center.y, 8 / scale, 0, 2 * Math.PI); 
+        ctx.arc(center.x, center.y, 10 / scale, 0, 2 * Math.PI);
         ctx.fillStyle = div.countryId === 1 ? "blue" : "red"; 
         ctx.fill(); 
         ctx.strokeStyle = selectedDiv === i ? "yellow" : "white"; 
         ctx.lineWidth = 2 / scale; 
-        ctx.stroke(); 
+        ctx.stroke();
+        ctx.font = 20/scale+"px serif";
+        ctx.fillStyle = "white"
+        ctx.fillText("1", center.x-9 / scale+3.6/scale, center.y+9 / scale-2.7/scale); 
         const barW = 20 / scale, barH = 4 / scale, barX = center.x - barW / 2, barY = center.y + 12 / scale; 
         ctx.fillStyle = '#550000'; 
         ctx.fillRect(barX, barY, barW, barH); 
@@ -349,7 +353,7 @@ function drawMap() {
                     div.isMoving = false;
                     const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
                     if (defenderIndex !== -1) {
-                        div.strength = 0;
+                       // div.strength = 0;
                     } else {
                         div.region = div.targetRegion;
                         div.province = div.targetProvince;
