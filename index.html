@@ -328,7 +328,17 @@ function drawMap() {
         // --- GAME LOGIC LOOP ---
         function updateGameLogic() {
             // 1. Process Combat
-            divarr.forEach(div => { if (div.inCombat && div.isMoving) { const opponent = divarr[div.combatTargetIndex]; if (opponent && opponent.inCombat) { const distLeft = 1 - Math.min((currentGameTime - div.movementStartTime) / div.movementDuration, 1.0); const atkDmgFactor = 1 / (distLeft + 0.05); opponent.strength -= BASE_HOURLY_DAMAGE * (div.strength / 100) * atkDmgFactor; div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100); } } });
+            divarr.forEach(div =>{
+            if (div.inCombat && div.isMoving) {
+                const opponent = divarr[div.combatTargetIndex];
+                if (opponent && opponent.inCombat) {
+                const distPassed = Math.min((currentGameTime - div.movementStartTime) / div.movementDuration, 1.0);
+                const atkDmgFactor = 1 * (distPassed + 0.2);
+                opponent.strength -= BASE_HOURLY_DAMAGE * (div.strength / 100) * atkDmgFactor;
+                div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100);
+                }
+            }
+            });
             // 2. Remove destroyed units & clean up combat states
             const deadDivs = divarr.map((d, i) => d.strength <= 0 ? i : -1).filter(i => i !== -1);
             if (deadDivs.length > 0) {
@@ -353,7 +363,10 @@ function drawMap() {
                     div.isMoving = false;
                     const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
                     if (defenderIndex !== -1) {
-                       // div.strength = 0;
+                        div.movementDuration=0;
+                        div.isMoving = true;
+                        div.targetRegion = div.region ;
+                        div.targetProvince = div.province;
                     } else {
                         div.region = div.targetRegion;
                         div.province = div.targetProvince;
