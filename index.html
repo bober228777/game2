@@ -363,10 +363,15 @@ function drawMap() {
                     div.isMoving = false;
                     const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
                     if (defenderIndex !== -1) {
-                        div.movementDuration=0;
                         div.isMoving = true;
+                        let currentPos = div.getCurrentPosition();
+                        div.startPosition = currentPos; // Re-route from current position
+                        div.endPosition = getPolygonCenter( polygons[div.region].provinces[div.province].points);
+                        div.movementStartTime = new Date(currentGameTime.getTime());
+                        div.movementDuration = MOVEMENT_DURATION_MS;
                         div.targetRegion = div.region ;
                         div.targetProvince = div.province;
+                        disengageCombat(div);
                     } else {
                         div.region = div.targetRegion;
                         div.province = div.targetProvince;
