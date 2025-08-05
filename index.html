@@ -147,7 +147,10 @@
         }
         
         let divarr = [];
+        divarr.push(new Division(1, 0, 1));
+        divarr.push(new Division(1, 1, 1));
         divarr.push(new Division(2, 2, 2));
+        divarr.push(new Division(2, 0, 2));
         divarr.push(new Division(2, 3, 2)); // Red Unit
         divarr.push(new Division(0, 0, 1)); // Blue Unit
 
@@ -429,8 +432,10 @@ function drawMap() {
                             const defender = divarr[defenderIndex];
                             attacker.inCombat = true;
                             attacker.combatTargetIndex = defenderIndex;
+                            if(defender.inCombat==false){
                             defender.inCombat = true;
                             defender.combatTargetIndex = selectedDiv;
+                            }
                         }
                         selectedDiv = -1; // Deselect after issuing order
                         selectedPolygon = null;
