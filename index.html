@@ -209,6 +209,7 @@
             }
             unit.inCombat = false;
             unit.combatTargetIndex = -1;
+            console.log('1231231')
         }
 
         // --- DRAWING FUNCTIONS ---
@@ -365,14 +366,14 @@ function drawMap() {
                     if (elapsed >= div.movementDuration) {
                     div.isMoving = false;
                     const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
-                    if (defenderIndex !== -1) {
+                    if (defenderIndex !== -1 && divarr[defenderIndex].countryId !== div.countryId){
                         div.isMoving = true;
                         let currentPos = div.getCurrentPosition();
                         div.startPosition = currentPos; // Re-route from current position
                         div.endPosition = getPolygonCenter( polygons[div.region].provinces[div.province].points);
                         div.movementStartTime = new Date(currentGameTime.getTime());
                         div.movementDuration = MOVEMENT_DURATION_MS;
-                        div.targetRegion = div.region ;
+                        div.targetRegion = div.region;
                         div.targetProvince = div.province;
                         disengageCombat(div);
                     } else {
