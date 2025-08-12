@@ -163,17 +163,66 @@
         let naturalWidth = 0, naturalHeight = 0, panClickThreshold = 5, mousedownPos = {x:0, y:0};
 
         // --- HELPER FUNCTIONS ---
-        function pointsAreEqual(p1, p2) { return p1.x === p2.x && p1.y === p2.y; }
-        function areNeighbors(points1, points2) { for (let p1 of points1) { for (let p2 of points2) { if (pointsAreEqual(p1, p2)) return true; } } return false; }
-        function generateRoots(polygonsData) { polygonsData.forEach((r1, i) => r1.provinces.forEach((p1, j) => { p1.roots = p1.roots || []; polygonsData.forEach((r2, k) => r2.provinces.forEach((p2, l) => { if ((i === k && j === l) || !areNeighbors(p1.points, p2.points)) return; if (!p1.roots.some(r => r.region === k && r.province === l)) p1.roots.push({ region: k, province: l }); })); })); }
-        generateRoots(polygons);
+       function pointsAreEqual(p1, p2) {
+    return p1.x === p2.x && p1.y === p2.y;
+}
+function areNeighbors(points1, points2) {
+    for (let p1 of points1) {
+        for (let p2 of points2) {
+            if (pointsAreEqual(p1, p2))
+                return true;
+        }
+    }
+    return false;
+}
+function generateRoots(polygonsData) {
+    polygonsData.forEach((r1, i) => r1.provinces.forEach((p1, j) => {
+        p1.roots = p1.roots || [];
+        polygonsData.forEach((r2, k) => r2.provinces.forEach((p2, l) => {
+            if ((i === k&& j === l) || !areNeighbors(p1.points, p2.points))
+                return;
+            if (!p1.roots.some(r => r.region === k&& r.province === l))
+                p1.roots.push({region : k, province : l});
+        }));
+    }));
+}
+generateRoots(polygons);
 
-        function getPolygonCenter(polygonPoints) { if (!polygonPoints || polygonPoints.length === 0) return { x: 0, y: 0 }; let sX = 0, sY = 0; polygonPoints.forEach(p => { sX += p.x; sY += p.y; }); return { x: sX / polygonPoints.length, y: sY / polygonPoints.length }; }
-        function isPointInPolygon(point, polygonPoints) { let x = point.x, y = point.y, inside = false; for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) { let xi = polygonPoints[i].x, yi = polygonPoints[i].y; let xj = polygonPoints[j].x, yj = polygonPoints[j].y; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside; } return inside; }
-        
-        function findStaticDivisionAt(regionIdx, provinceIdx) { return divarr.findIndex(div => !div.isMoving && div.region === regionIdx && div.province === provinceIdx); }
-        function isProvinceOccupiedOrTargeted(regionIdx, provinceIdx) { for(let i=0; i < divarr.length; i++) { const div = divarr[i]; if ((!div.isMoving && div.region === regionIdx && div.province === provinceIdx) || (div.isMoving && div.targetRegion === regionIdx && div.targetProvince === provinceIdx)) return i; } return -1; }
-        
+function getPolygonCenter(polygonPoints) {
+    if (!polygonPoints || polygonPoints.length === 0)
+        return {x : 0, y : 0};
+    let sX = 0, sY = 0;
+    polygonPoints.forEach(p => {
+        sX += p.x;
+        sY += p.y;
+    });
+    return {x : sX / polygonPoints.length, y : sY / polygonPoints.length};
+}
+function isPointInPolygon(point, polygonPoints) {
+    let x = point.x, y = point.y, inside = false;
+    for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
+        let xi = polygonPoints[i].x, yi = polygonPoints[i].y;
+        let xj = polygonPoints[j].x, yj = polygonPoints[j].y;
+        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
+            inside = !inside;
+    }
+    return inside;
+}
+
+function findStaticDivisionAt(regionIdx, provinceIdx) {
+    return divarr.findIndex(div => !div.isMoving && div.region === regionIdx && div.province === provinceIdx);
+}
+function isProvinceOccupiedOrTargeted(division) {
+    let regionIdx = division.targetRegion;
+    let provinceIdx = division.targetProvince 
+    for (let i = 0; i < divarr.length; i++) {
+        const div = divarr[i];
+        if ((!div.isMoving && div.region === regionIdx&& div.province === provinceIdx) || (div.isMoving&& div.targetRegion === regionIdx&& div.targetProvince === provinceIdx))
+            return i;
+    }
+    return -1;
+}
+
         // NEW: Find which province contains a given coordinate point
         function findProvinceAtCoordinates(x, y) {
             for (let i = 0; i < polygons.length; i++) {
@@ -418,7 +467,6 @@ function drawMap() {
                     if (isAdjacent) {
                         disengageCombat(attacker); // Always disengage from old combat before new order
                         
-                        const defenderIndex = isProvinceOccupiedOrTargeted(clickedProvinceData.region, clickedProvinceData.province);
                         
                         attacker.isMoving = true;
                         attacker.startPosition = currentPos; // Re-route from current position
@@ -428,6 +476,8 @@ function drawMap() {
                         attacker.targetRegion = clickedProvinceData.region;
                         attacker.targetProvince = clickedProvinceData.province;
 
+                        const defenderIndex = isProvinceOccupiedOrTargeted(attacker);
+                        
                         if (defenderIndex !== -1 && divarr[defenderIndex].countryId !== attacker.countryId) {
                             // ATTACK order
                             const defender = divarr[defenderIndex];
@@ -437,6 +487,7 @@ function drawMap() {
                             defender.inCombat = true;
                             defender.combatTargetIndex = selectedDiv;
                             }
+                            console.log(attacker.combatTargetIndex)
                         }
                         selectedDiv = -1; // Deselect after issuing order
                         selectedPolygon = null;
