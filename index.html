@@ -218,7 +218,7 @@ function isProvinceOccupiedOrTargeted(division) {
     for (let i = 0; i < divarr.length; i++) {
         const div = divarr[i];
         if ((!div.isMoving && div.region === regionIdx&& div.province === provinceIdx) || (div.isMoving&& div.targetRegion === regionIdx&& div.targetProvince === provinceIdx))
-            return i;
+            if (division.countryId != div.countryId) return i;
     }
     return -1;
 }
