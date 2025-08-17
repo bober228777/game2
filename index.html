@@ -388,7 +388,7 @@ function drawMap() {
                 const distPassed = Math.min((currentGameTime - div.movementStartTime) / div.movementDuration, 1.0);
                 const atkDmgFactor = 1 * (distPassed + 0.2);
                 opponent.strength -= BASE_HOURLY_DAMAGE * (div.strength / 100) * atkDmgFactor;
-                div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100);
+                if (divarr[opponent.combatTargetIndex].province == div.province && divarr[opponent.combatTargetIndex].region == div.region) div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100);
                 }
             }
             });
