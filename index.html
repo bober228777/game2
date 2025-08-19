@@ -33,7 +33,7 @@
             border: 2px solid #555;
             overflow: hidden;
             position: relative;
-            cursor: grab;
+            cursor: grab; 
             touch-action: none;
             background-color: #111;
         }
@@ -67,7 +67,7 @@
     <div id="map-controls">
         Zoom: <span id="zoom-level">100</span>% <br>
         Selected Province: <span id="selected-region-info">-</span><br>
-        <span id="instructions" style="color: #ffc107;">Click a unit to select. Click an adjacent province to move/attack, even while it's moving.</span><br>
+        <span id="instructions" style="color: #ffc107;">Player 1 (Blue): WASD+Space | Player 2 (Red): Arrows+Enter | Mouse click still works.</span><br>
         Time: <span id="time">01/01/2025, 00:00:00</span>
     </div>
 
@@ -114,13 +114,26 @@
         const MOVEMENT_DURATION_MS = 3 * 24 * 60 * 60 * 1000; // 3 days in game time
         const BASE_HOURLY_DAMAGE = 0.5;
         const GAME_SPEED_MS = 250;
-        let selectedDiv = -1;
+
+        // --- NEW --- State for player selections
+        let playerSelections = {
+            player1: -1, // index of division for player 1 (Blue)
+            player2: -1  // index of division for player 2 (Red)
+        };
+
+        // --- VIRTUAL CURSOR -- State variables for cursors and keyboard input
+        const cursors = {
+            player1: { x: 1500, y: 1350, color: 'cyan', size: 15 },
+            player2: { x: 1600, y: 1200, color: 'magenta', size: 15 }
+        };
+        const cursorSpeed = 10; // Base speed in map units per frame
+        const keysPressed = {}; // Stores the state of currently pressed keys
 
         class Division {
             constructor(region, province, countryId) {
                 this.region = region;
                 this.province = province;
-                this.countryId = countryId;
+                this.countryId = countryId; // 1 for Blue, 2 for Red
                 this.strength = 100;
                 this.isMoving = false;
                 this.movementStartTime = null;
@@ -147,12 +160,12 @@
         }
         
         let divarr = [];
-        divarr.push(new Division(1, 0, 1));
-        divarr.push(new Division(1, 1, 1));
-        divarr.push(new Division(2, 2, 2));
-        divarr.push(new Division(2, 0, 2));
-        divarr.push(new Division(2, 3, 2)); // Red Unit
-        divarr.push(new Division(0, 0, 1)); // Blue Unit
+        divarr.push(new Division(1, 0, 1)); // Blue
+        divarr.push(new Division(1, 1, 1)); // Blue
+        divarr.push(new Division(0, 0, 1)); // Blue
+        divarr.push(new Division(2, 2, 2)); // Red
+        divarr.push(new Division(2, 0, 2)); // Red
+        divarr.push(new Division(2, 3, 2)); // Red
 
         // --- MAP RENDERING STATE ---
         let selectedPolygon = null;
@@ -163,313 +176,161 @@
         let naturalWidth = 0, naturalHeight = 0, panClickThreshold = 5, mousedownPos = {x:0, y:0};
 
         // --- HELPER FUNCTIONS ---
-       function pointsAreEqual(p1, p2) {
-    return p1.x === p2.x && p1.y === p2.y;
-}
-function areNeighbors(points1, points2) {
-    for (let p1 of points1) {
-        for (let p2 of points2) {
-            if (pointsAreEqual(p1, p2))
-                return true;
-        }
-    }
-    return false;
-}
-function generateRoots(polygonsData) {
-    polygonsData.forEach((r1, i) => r1.provinces.forEach((p1, j) => {
-        p1.roots = p1.roots || [];
-        polygonsData.forEach((r2, k) => r2.provinces.forEach((p2, l) => {
-            if ((i === k&& j === l) || !areNeighbors(p1.points, p2.points))
-                return;
-            if (!p1.roots.some(r => r.region === k&& r.province === l))
-                p1.roots.push({region : k, province : l});
-        }));
-    }));
-}
-generateRoots(polygons);
-
-function getPolygonCenter(polygonPoints) {
-    if (!polygonPoints || polygonPoints.length === 0)
-        return {x : 0, y : 0};
-    let sX = 0, sY = 0;
-    polygonPoints.forEach(p => {
-        sX += p.x;
-        sY += p.y;
-    });
-    return {x : sX / polygonPoints.length, y : sY / polygonPoints.length};
-}
-function isPointInPolygon(point, polygonPoints) {
-    let x = point.x, y = point.y, inside = false;
-    for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) {
-        let xi = polygonPoints[i].x, yi = polygonPoints[i].y;
-        let xj = polygonPoints[j].x, yj = polygonPoints[j].y;
-        if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi))
-            inside = !inside;
-    }
-    return inside;
-}
-
-function findStaticDivisionAt(regionIdx, provinceIdx) {
-    return divarr.findIndex(div => !div.isMoving && div.region === regionIdx && div.province === provinceIdx);
-}
-function isProvinceOccupiedOrTargeted(division) {
-    let regionIdx = division.targetRegion;
-    let provinceIdx = division.targetProvince 
-    for (let i = 0; i < divarr.length; i++) {
-        const div = divarr[i];
-        if ((!div.isMoving && div.region === regionIdx&& div.province === provinceIdx) || (div.isMoving&& div.targetRegion === regionIdx&& div.targetProvince === provinceIdx))
-            if (division.countryId != div.countryId) return i;
-    }
-    return -1;
-}
-
-        // NEW: Find which province contains a given coordinate point
-        function findProvinceAtCoordinates(x, y) {
-            for (let i = 0; i < polygons.length; i++) {
-                for (let j = 0; j < polygons[i].provinces.length; j++) {
-                    if (isPointInPolygon({ x, y }, polygons[i].provinces[j].points)) {
-                        return { region: i, province: j, polygon: polygons[i].provinces[j] };
-                    }
-                }
-            }
-            return null;
-        }
-
-        // NEW: Find a division by clicking near its icon, not just its province
-        function findDivisionAtCoordinates(x, y) {
-            for (let i = 0; i < divarr.length; i++) {
-                const divPos = divarr[i].getCurrentPosition();
-                const distance = Math.sqrt(Math.pow(x - divPos.x, 2) + Math.pow(y - divPos.y, 2));
-                if (distance < 10) { // Click radius of 10 map units
-                    return i;
-                }
-            }
-            return -1;
-        }
-
-        // NEW: Disengage a unit from combat
-        function disengageCombat(unit) {
-            if (unit.inCombat && unit.combatTargetIndex !== -1) {
-                const opponent = divarr[unit.combatTargetIndex];
-                if (opponent) {
-                    opponent.inCombat = false;
-                    opponent.combatTargetIndex = -1;
-                }
-            }
-            unit.inCombat = false;
-            unit.combatTargetIndex = -1;
-            console.log('1231231')
-        }
+       function pointsAreEqual(p1, p2) { return p1.x === p2.x && p1.y === p2.y; }
+       function areNeighbors(points1, points2) { for (let p1 of points1) { for (let p2 of points2) { if (pointsAreEqual(p1, p2)) return true; } } return false; }
+       function generateRoots(polygonsData) { polygonsData.forEach((r1, i) => r1.provinces.forEach((p1, j) => { p1.roots = p1.roots || []; polygonsData.forEach((r2, k) => r2.provinces.forEach((p2, l) => { if ((i === k&& j === l) || !areNeighbors(p1.points, p2.points)) return; if (!p1.roots.some(r => r.region === k&& r.province === l)) p1.roots.push({region : k, province : l}); })); })); }
+       generateRoots(polygons);
+       function getPolygonCenter(polygonPoints) { if (!polygonPoints || polygonPoints.length === 0) return {x : 0, y : 0}; let sX = 0, sY = 0; polygonPoints.forEach(p => { sX += p.x; sY += p.y; }); return {x : sX / polygonPoints.length, y : sY / polygonPoints.length}; }
+       function isPointInPolygon(point, polygonPoints) { let x = point.x, y = point.y, inside = false; for (let i = 0, j = polygonPoints.length - 1; i < polygonPoints.length; j = i++) { let xi = polygonPoints[i].x, yi = polygonPoints[i].y; let xj = polygonPoints[j].x, yj = polygonPoints[j].y; if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside; } return inside; }
+       function findStaticDivisionAt(regionIdx, provinceIdx) { return divarr.findIndex(div => !div.isMoving && div.region === regionIdx && div.province === provinceIdx); }
+       function isProvinceOccupiedOrTargeted(division) { let regionIdx = division.targetRegion; let provinceIdx = division.targetProvince; for (let i = 0; i < divarr.length; i++) { const div = divarr[i]; if ((!div.isMoving && div.region === regionIdx&& div.province === provinceIdx) || (div.isMoving&& div.targetRegion === regionIdx&& div.targetProvince === provinceIdx)) if (division.countryId != div.countryId) return i; } return -1; }
+       function findProvinceAtCoordinates(x, y) { for (let i = 0; i < polygons.length; i++) { for (let j = 0; j < polygons[i].provinces.length; j++) { if (isPointInPolygon({ x, y }, polygons[i].provinces[j].points)) { return { region: i, province: j, polygon: polygons[i].provinces[j] }; } } } return null; }
+       function findDivisionAtCoordinates(x, y) { for (let i = 0; i < divarr.length; i++) { const divPos = divarr[i].getCurrentPosition(); const distance = Math.sqrt(Math.pow(x - divPos.x, 2) + Math.pow(y - divPos.y, 2)); if (distance < 10 / scale) { return i; } } return -1; }
+       function disengageCombat(unit) { if (unit.inCombat && unit.combatTargetIndex !== -1) { const opponent = divarr[unit.combatTargetIndex]; if (opponent) { opponent.inCombat = false; opponent.combatTargetIndex = -1; } } unit.inCombat = false; unit.combatTargetIndex = -1; }
 
         // --- DRAWING FUNCTIONS ---
         function drawArrow(ctx, fromX, fromY, toX, toY, color = "yellow", headLength = 15) { const dx = toX - fromX, dy = toY - fromY, angle = Math.atan2(dy, dx), hL = headLength / scale; ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.lineTo(toX - hL * Math.cos(angle - Math.PI / 6), toY - hL * Math.sin(angle - Math.PI / 6)); ctx.moveTo(toX, toY); ctx.lineTo(toX - hL * Math.cos(angle + Math.PI / 6), toY - hL * Math.sin(angle + Math.PI / 6)); ctx.strokeStyle = color; ctx.lineWidth = 3 / scale; ctx.stroke(); }
-function drawMap() { 
-    if (!mapImage.complete || naturalWidth === 0) return; 
-    ctx.clearRect(0, 0, canvas.width, canvas.height); 
-    ctx.save(); 
-    ctx.translate(panX, panY); 
-    ctx.scale(scale, scale); 
-    ctx.imageSmoothingEnabled = scale > 1.0; 
-    ctx.drawImage(mapImage, 0, 0, naturalWidth, naturalHeight); 
-    
-    // Draw province polygons
-    polygons.forEach(r => r.provinces.forEach(p => { 
-        ctx.beginPath(); 
-        p.points.forEach((v, i) => i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)); 
-        ctx.closePath(); 
-        ctx.fillStyle = p.color; 
-        ctx.fill(); 
-        ctx.strokeStyle = r.borderColor; 
-        ctx.lineWidth = 1.5 / scale; 
-        ctx.stroke(); 
-    })); 
-    
-    // Highlight selected province
-    if (selectedPolygon) { 
-        const r = polygons[selectedPolygonRegionIndex]; 
-        ctx.beginPath(); 
-        selectedPolygon.points.forEach((v, i) => i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)); 
-        ctx.closePath(); 
-        ctx.fillStyle = r.selectedColor; 
-        ctx.fill(); 
-        ctx.strokeStyle = r.selectedBorderColor; 
-        ctx.lineWidth = 3 / scale; 
-        ctx.stroke(); 
-    } 
-    
-    // Draw movement arrows for selected unit
-    if (selectedDiv !== -1) { 
-        const div = divarr[selectedDiv]; 
-        const currentPos = div.getCurrentPosition(); 
-        const currentProvinceData = findProvinceAtCoordinates(currentPos.x, currentPos.y); 
-        if (currentProvinceData) { 
-            const province = currentProvinceData.polygon; 
-            if (province.roots) {
-                province.roots.forEach(root => { 
-                    const target = getPolygonCenter(polygons[root.region].provinces[root.province].points); 
-                    drawArrow(ctx, currentPos.x, currentPos.y, target.x, target.y, '#3498db', 15); 
-                }); 
-            }
-        } 
-    } 
-    
-    // Draw units and their strength bars
-    divarr.forEach((div, i) => { 
-        const center = div.getCurrentPosition(); 
-        ctx.beginPath(); 
-        ctx.arc(center.x, center.y, 10 / scale, 0, 2 * Math.PI);
-        ctx.fillStyle = div.countryId === 1 ? "blue" : "red"; 
-        ctx.fill(); 
-        ctx.strokeStyle = selectedDiv === i ? "yellow" : "white"; 
-        ctx.lineWidth = 2 / scale; 
-        ctx.stroke();
-        ctx.font = 20/scale+"px serif";
-        ctx.fillStyle = "white"
-        ctx.fillText("1", center.x-9 / scale+3.6/scale, center.y+9 / scale-2.7/scale); 
-        const barW = 20 / scale, barH = 4 / scale, barX = center.x - barW / 2, barY = center.y + 12 / scale; 
-        ctx.fillStyle = '#550000'; 
-        ctx.fillRect(barX, barY, barW, barH); 
-        ctx.fillStyle = '#00ff00'; 
-        ctx.fillRect(barX, barY, barW * (div.strength / 100), barH); 
-    });
+        function drawMap() { 
+            if (!mapImage.complete || naturalWidth === 0) return; 
+            ctx.clearRect(0, 0, canvas.width, canvas.height); 
+            ctx.save(); 
+            ctx.translate(panX, panY); 
+            ctx.scale(scale, scale); 
+            ctx.imageSmoothingEnabled = scale > 1.0; 
+            ctx.drawImage(mapImage, 0, 0, naturalWidth, naturalHeight); 
+            
+            polygons.forEach(r => r.provinces.forEach(p => { ctx.beginPath(); p.points.forEach((v, i) => i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)); ctx.closePath(); ctx.fillStyle = p.color; ctx.fill(); ctx.strokeStyle = r.borderColor; ctx.lineWidth = 1.5 / scale; ctx.stroke(); })); 
+            
+            if (selectedPolygon) { const r = polygons[selectedPolygonRegionIndex]; ctx.beginPath(); selectedPolygon.points.forEach((v, i) => i === 0 ? ctx.moveTo(v.x, v.y) : ctx.lineTo(v.x, v.y)); ctx.closePath(); ctx.fillStyle = r.selectedColor; ctx.fill(); ctx.strokeStyle = r.selectedBorderColor; ctx.lineWidth = 3 / scale; ctx.stroke(); } 
+            
+            // --- NEW --- Draw movement arrows for any selected unit
+            ['player1', 'player2'].forEach(player => {
+                const selectedIndex = playerSelections[player];
+                if (selectedIndex !== -1) {
+                    const div = divarr[selectedIndex];
+                    const currentPos = div.getCurrentPosition();
+                    const currentProvinceData = findProvinceAtCoordinates(currentPos.x, currentPos.y);
+                    if (currentProvinceData && currentProvinceData.polygon.roots) {
+                        currentProvinceData.polygon.roots.forEach(root => {
+                            const target = getPolygonCenter(polygons[root.region].provinces[root.province].points);
+                            drawArrow(ctx, currentPos.x, currentPos.y, target.x, target.y, '#3498db', 15);
+                        });
+                    }
+                }
+            });
+            
+            divarr.forEach((div, i) => { 
+                const center = div.getCurrentPosition(); 
+                ctx.beginPath(); ctx.arc(center.x, center.y, 10 / scale, 0, 2 * Math.PI); 
+                ctx.fillStyle = div.countryId === 1 ? "blue" : "red"; 
+                ctx.fill(); 
 
-    // --- NEW & CORRECTED: Draw Battle Icons ---
-    const activeBattleLocations = new Set();
+                // --- NEW --- Use player-specific colors for selection highlight
+                let strokeColor = "white";
+                if (playerSelections.player1 === i) strokeColor = cursors.player1.color;
+                else if (playerSelections.player2 === i) strokeColor = cursors.player2.color;
+                
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = 2 / scale; 
+                ctx.stroke(); 
+                ctx.font = 20/scale+"px serif"; 
+                ctx.fillStyle = "white"; 
+                ctx.fillText("1", center.x-9 / scale+3.6/scale, center.y+9 / scale-2.7/scale); 
+                const barW = 20 / scale, barH = 4 / scale, barX = center.x - barW / 2, barY = center.y + 12 / scale; 
+                ctx.fillStyle = '#550000'; ctx.fillRect(barX, barY, barW, barH); 
+                ctx.fillStyle = '#00ff00'; ctx.fillRect(barX, barY, barW * (div.strength / 100), barH); 
+            });
 
-    // A battle is defined by an attacking unit that is moving towards a target.
-    // The battle itself takes place in the target's province.
-    divarr.forEach(unit => {
-        if (unit.isMoving && unit.inCombat) {
-            // The battle location is the unit's destination.
-            const battleKey = `${unit.targetRegion},${unit.targetProvince}`;
-            activeBattleLocations.add(battleKey);
+            const activeBattleLocations = new Set();
+            divarr.forEach(unit => { if (unit.isMoving && unit.inCombat) { const battleKey = `${unit.targetRegion},${unit.targetProvince}`; activeBattleLocations.add(battleKey); } });
+            activeBattleLocations.forEach(battleKey => {
+                const [regionStr, provinceStr] = battleKey.split(',');
+                const regionIndex = parseInt(regionStr, 10);
+                const provinceIndex = parseInt(provinceStr, 10);
+                const provincePolygon = polygons[regionIndex].provinces[provinceIndex];
+                if (!provincePolygon) return;
+                const battleCenter = getPolygonCenter(provincePolygon.points);
+                ctx.font = `bold ${24 / scale}px 'Segoe UI Emoji', sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.strokeStyle = 'black';
+                ctx.lineWidth = 4 / scale;
+                ctx.strokeText('⚔️', battleCenter.x, battleCenter.y);
+                ctx.fillStyle = '#ffc107';
+                ctx.fillText('⚔️', battleCenter.x, battleCenter.y);
+            });
+
+            Object.values(cursors).forEach(cursor => {
+                ctx.strokeStyle = cursor.color;
+                ctx.lineWidth = 2 / scale;
+                ctx.beginPath();
+                ctx.moveTo(cursor.x - cursor.size / scale, cursor.y);
+                ctx.lineTo(cursor.x + cursor.size / scale, cursor.y);
+                ctx.moveTo(cursor.x, cursor.y - cursor.size / scale);
+                ctx.lineTo(cursor.x, cursor.y + cursor.size / scale);
+                ctx.stroke();
+            });
+
+            ctx.restore(); 
+            zoomLevelSpan.textContent = Math.round(scale * 100); 
         }
-    });
-
-    // Now, draw one icon for each unique battle location.
-    activeBattleLocations.forEach(battleKey => {
-        const [regionStr, provinceStr] = battleKey.split(',');
-        const regionIndex = parseInt(regionStr, 10);
-        const provinceIndex = parseInt(provinceStr, 10);
-
-        // Get the center of the province where the battle is.
-        const provincePolygon = polygons[regionIndex].provinces[provinceIndex];
-        if (!provincePolygon) return; // Safety check
-        
-        const battleCenter = getPolygonCenter(provincePolygon.points);
-
-        // Draw the icon
-        ctx.font = `bold ${24 / scale}px 'Segoe UI Emoji', sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-
-        // Add a black stroke for better visibility
-        ctx.strokeStyle = 'black';
-        ctx.lineWidth = 4 / scale; // Make the outline thicker
-        ctx.strokeText('⚔️', battleCenter.x, battleCenter.y);
-        
-        // Fill the icon with a fiery color
-        ctx.fillStyle = '#ffc107'; // A nice orange/yellow
-        ctx.fillText('⚔️', battleCenter.x, battleCenter.y);
-    });
-
-    ctx.restore(); 
-    zoomLevelSpan.textContent = Math.round(scale * 100); 
-}
-        function applyConstraintsAndDraw() { const mapW = naturalWidth * scale, mapH = naturalHeight * scale; panX = (mapW <= canvas.width) ? (canvas.width - mapW) / 2 : Math.max(canvas.width - mapW, Math.min(0, panX)); panY = (mapH <= canvas.height) ? (canvas.height - mapH) / 2 : Math.max(canvas.height - mapH, Math.min(0, panY)); drawMap(); }
+        function applyConstraintsAndDraw() { const mapW = naturalWidth * scale, mapH = naturalHeight * scale; panX = (mapW <= canvas.width) ? (canvas.width - mapW) / 2 : Math.max(canvas.width - mapW, Math.min(0, panX)); panY = (mapH <= canvas.height) ? (canvas.height - mapH) / 2 : Math.max(canvas.height - mapH, Math.min(0, panY)); }
 
         // --- GAME LOGIC LOOP ---
         function updateGameLogic() {
-            // 1. Process Combat
-            divarr.forEach(div =>{
-            if (div.inCombat && div.isMoving) {
-                const opponent = divarr[div.combatTargetIndex];
-                if (opponent && opponent.inCombat) {
-                const distPassed = Math.min((currentGameTime - div.movementStartTime) / div.movementDuration, 1.0);
-                const atkDmgFactor = 1 * (distPassed + 0.2);
-                opponent.strength -= BASE_HOURLY_DAMAGE * (div.strength / 100) * atkDmgFactor;
-                if (divarr[opponent.combatTargetIndex].province == div.province && divarr[opponent.combatTargetIndex].region == div.region) div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100);
-                }
-            }
-            });
-            // 2. Remove destroyed units & clean up combat states
+            divarr.forEach(div =>{ if (div.inCombat && div.isMoving) { const opponent = divarr[div.combatTargetIndex]; if (opponent && opponent.inCombat) { const distPassed = Math.min((currentGameTime - div.movementStartTime) / div.movementDuration, 1.0); const atkDmgFactor = 1 * (distPassed + 0.2); opponent.strength -= BASE_HOURLY_DAMAGE * (div.strength / 100) * atkDmgFactor; if (divarr[opponent.combatTargetIndex].province == div.province && divarr[opponent.combatTargetIndex].region == div.region) div.strength -= BASE_HOURLY_DAMAGE * (opponent.strength / 100); } } });
             const deadDivs = divarr.map((d, i) => d.strength <= 0 ? i : -1).filter(i => i !== -1);
             if (deadDivs.length > 0) {
-                deadDivs.reverse().forEach(deadIndex => {
-                    const deadUnit = divarr[deadIndex];
-                    disengageCombat(deadUnit); // Disengage before removing
-                    divarr.splice(deadIndex, 1);
-                    // Update indices for remaining units
-                    divarr.forEach(div => {
-                        if (div.combatTargetIndex > deadIndex) div.combatTargetIndex--;
-                    });
-                    if (selectedDiv > deadIndex) selectedDiv--;
-                    else if (selectedDiv === deadIndex) selectedDiv = -1;
+                deadDivs.reverse().forEach(deadIndex => { 
+                    const deadUnit = divarr[deadIndex]; 
+                    disengageCombat(deadUnit); 
+                    divarr.splice(deadIndex, 1); 
+                    divarr.forEach(div => { if (div.combatTargetIndex > deadIndex) div.combatTargetIndex--; }); 
+                    
+                    // --- NEW --- Update selections for both players if a unit is destroyed
+                    if (playerSelections.player1 > deadIndex) playerSelections.player1--;
+                    else if (playerSelections.player1 === deadIndex) playerSelections.player1 = -1;
+                    
+                    if (playerSelections.player2 > deadIndex) playerSelections.player2--;
+                    else if (playerSelections.player2 === deadIndex) playerSelections.player2 = -1;
                 });
             }
+           divarr.forEach(div =>{ if (div.isMoving) { const elapsed = currentGameTime - div.movementStartTime; if (elapsed >= div.movementDuration) { div.isMoving = false; const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince); if (defenderIndex !== -1 && divarr[defenderIndex].countryId !== div.countryId){ div.isMoving = true; let currentPos = div.getCurrentPosition(); div.startPosition = currentPos; div.endPosition = getPolygonCenter( polygons[div.region].provinces[div.province].points); div.movementStartTime = new Date(currentGameTime.getTime()); div.movementDuration = MOVEMENT_DURATION_MS; div.targetRegion = div.region; div.targetProvince = div.province; disengageCombat(div); } else { div.region = div.targetRegion; div.province = div.targetProvince; } } } });
+           divarr.forEach(div => { if(div.inCombat==false){ if(div.countryId==1){ polygons[div.region].provinces[div.province].color = 'rgba(0, 0, 255, 0.35)' }else{ polygons[div.region].provinces[div.province].color = 'rgba(255, 0, 0, 0.35)' } } });
+        }
+        
+        function updateCursors() {
+            if (keysPressed['w'] || keysPressed['W']) cursors.player1.y -= cursorSpeed / scale;
+            if (keysPressed['s'] || keysPressed['S']) cursors.player1.y += cursorSpeed / scale;
+            if (keysPressed['a'] || keysPressed['A']) cursors.player1.x -= cursorSpeed / scale;
+            if (keysPressed['d'] || keysPressed['D']) cursors.player1.x += cursorSpeed / scale;
             
-            // 3. Update Movement and Arrival
-           divarr.forEach(div =>{
-                if (div.isMoving) {
-                    const elapsed = currentGameTime - div.movementStartTime;
-                    if (elapsed >= div.movementDuration) {
-                    div.isMoving = false;
-                    const defenderIndex = findStaticDivisionAt(div.targetRegion, div.targetProvince);
-                    if (defenderIndex !== -1 && divarr[defenderIndex].countryId !== div.countryId){
-                        div.isMoving = true;
-                        let currentPos = div.getCurrentPosition();
-                        div.startPosition = currentPos; // Re-route from current position
-                        div.endPosition = getPolygonCenter( polygons[div.region].provinces[div.province].points);
-                        div.movementStartTime = new Date(currentGameTime.getTime());
-                        div.movementDuration = MOVEMENT_DURATION_MS;
-                        div.targetRegion = div.region;
-                        div.targetProvince = div.province;
-                        disengageCombat(div);
-                    } else {
-                        div.region = div.targetRegion;
-                        div.province = div.targetProvince;
-                    }
-                    }
-                }
-                });
-            divarr.forEach(div => { 
-                if(div.inCombat==false){
-                    if(div.countryId==1){
-                        polygons[div.region].provinces[div.province].color = 'rgba(0, 0, 255, 0.35)'
-                    }else{
-                        polygons[div.region].provinces[div.province].color = 'rgba(255, 0, 0, 0.35)'
-                    }                    
-                }
-            }
-        )
+            if (keysPressed['ArrowUp']) cursors.player2.y -= cursorSpeed / scale;
+            if (keysPressed['ArrowDown']) cursors.player2.y += cursorSpeed / scale;
+            if (keysPressed['ArrowLeft']) cursors.player2.x -= cursorSpeed / scale;
+            if (keysPressed['ArrowRight']) cursors.player2.x += cursorSpeed / scale;
         }
 
         // --- EVENT HANDLERS ---
-        canvas.addEventListener('click', (event) => {
-            const mouseMoveDist = Math.sqrt(Math.pow(event.clientX - mousedownPos.x, 2) + Math.pow(event.clientY - mousedownPos.y, 2));
-            if (mouseMoveDist > panClickThreshold) return;
-
-            const rect = canvas.getBoundingClientRect();
-            const clickX = (event.clientX - rect.left - panX) / scale;
-            const clickY = (event.clientY - rect.top - panY) / scale;
-            
+        
+        // --- NEW --- Central function to handle KEYBOARD interactions for a specific player
+        function handleKeyboardInteraction(clickX, clickY, player) {
             const clickedUnitIndex = findDivisionAtCoordinates(clickX, clickY);
             const clickedProvinceData = findProvinceAtCoordinates(clickX, clickY);
+            const selectedDivForPlayer = playerSelections[player];
 
-            // --- ACTION PHASE: A unit is selected, and we clicked a province to issue an order ---
-            if (selectedDiv !== -1 && clickedProvinceData) {
-                const attacker = divarr[selectedDiv];
+            // --- ACTION PHASE: A unit for THIS PLAYER is selected, and we clicked a province to issue an order ---
+            if (selectedDivForPlayer !== -1 && clickedProvinceData) {
+                const attacker = divarr[selectedDivForPlayer];
                 const currentPos = attacker.getCurrentPosition();
                 const currentProvinceData = findProvinceAtCoordinates(currentPos.x, currentPos.y);
 
                 if (currentProvinceData) {
                     const isAdjacent = currentProvinceData.polygon.roots.some(r => r.region === clickedProvinceData.region && r.province === clickedProvinceData.province);
                     if (isAdjacent) {
-                        disengageCombat(attacker); // Always disengage from old combat before new order
-                        
-                        
+                        disengageCombat(attacker);
                         attacker.isMoving = true;
-                        attacker.startPosition = currentPos; // Re-route from current position
+                        attacker.startPosition = currentPos;
                         attacker.endPosition = getPolygonCenter(clickedProvinceData.polygon.points);
                         attacker.movementStartTime = new Date(currentGameTime.getTime());
                         attacker.movementDuration = MOVEMENT_DURATION_MS;
@@ -477,74 +338,117 @@ function drawMap() {
                         attacker.targetProvince = clickedProvinceData.province;
 
                         const defenderIndex = isProvinceOccupiedOrTargeted(attacker);
-                        
                         if (defenderIndex !== -1 && divarr[defenderIndex].countryId !== attacker.countryId) {
-                            // ATTACK order
                             const defender = divarr[defenderIndex];
                             attacker.inCombat = true;
                             attacker.combatTargetIndex = defenderIndex;
-                            if(defender.inCombat==false){
-                            defender.inCombat = true;
-                            defender.combatTargetIndex = selectedDiv;
+                            if(!defender.inCombat){
+                                defender.inCombat = true;
+                                defender.combatTargetIndex = selectedDivForPlayer;
                             }
-                            console.log(attacker.combatTargetIndex)
                         }
-                        selectedDiv = -1; // Deselect after issuing order
+                        playerSelections[player] = -1;
                         selectedPolygon = null;
-                        drawMap();
-                        return;
+                        return; // Action taken
                     }
                 }
             }
 
             // --- SELECTION PHASE ---
             if (clickedUnitIndex !== -1) {
-                selectedDiv = clickedUnitIndex; // Select the clicked unit
-                const unitPos = divarr[clickedUnitIndex].getCurrentPosition();
-                const provinceData = findProvinceAtCoordinates(unitPos.x, unitPos.y);
-                if (provinceData) {
+                const clickedUnit = divarr[clickedUnitIndex];
+                const playerCountryId = (player === 'player1') ? 1 : 2;
+                if (clickedUnit.countryId === playerCountryId) {
+                    playerSelections[player] = (playerSelections[player] === clickedUnitIndex) ? -1 : clickedUnitIndex; // Toggle selection
+                }
+            } else if (clickedProvinceData) {
+                const staticDivIndex = findStaticDivisionAt(clickedProvinceData.region, clickedProvinceData.province);
+                 if (staticDivIndex !== -1) {
+                    const staticUnit = divarr[staticDivIndex];
+                    const playerCountryId = (player === 'player1') ? 1 : 2;
+                    if (staticUnit.countryId === playerCountryId) {
+                        playerSelections[player] = staticDivIndex;
+                    }
+                 } else {
+                     playerSelections[player] = -1; // Clicked empty province
+                 }
+            } else {
+                playerSelections[player] = -1; // Clicked outside map
+            }
+            
+            // Update the general highlight based on the new selection
+            const currentlySelected = playerSelections[player];
+            if (currentlySelected !== -1) {
+                 const unitPos = divarr[currentlySelected].getCurrentPosition();
+                 const provinceData = findProvinceAtCoordinates(unitPos.x, unitPos.y);
+                 if (provinceData) {
                     selectedPolygon = provinceData.polygon;
                     selectedPolygonRegionIndex = provinceData.region;
                     selectedPolygonProvinceIndex = provinceData.province;
                     selectedRegionInfoSpan.textContent = provinceData.polygon.name;
                 }
-            } else if (clickedProvinceData) {
-                selectedDiv = findStaticDivisionAt(clickedProvinceData.region, clickedProvinceData.province); // Select static unit in province if any
-                selectedPolygon = clickedProvinceData.polygon;
-                selectedPolygonRegionIndex = clickedProvinceData.region;
-                selectedPolygonProvinceIndex = clickedProvinceData.province;
-                selectedRegionInfoSpan.textContent = clickedProvinceData.polygon.name;
             } else {
-                // Clicked outside, deselect everything
-                selectedDiv = -1;
                 selectedPolygon = null;
                 selectedRegionInfoSpan.textContent = "-";
             }
-            drawMap();
+        }
+        
+        canvas.addEventListener('click', (event) => {
+            if (Math.sqrt(Math.pow(event.clientX - mousedownPos.x, 2) + Math.pow(event.clientY - mousedownPos.y, 2)) > panClickThreshold) return;
+            const rect = canvas.getBoundingClientRect();
+            const clickX = (event.clientX - rect.left - panX) / scale;
+            const clickY = (event.clientY - rect.top - panY) / scale;
+            
+            // --- MOUSE CLICK LOGIC (Simplified for shared control)
+            handleKeyboardInteraction(clickX, clickY, 'player1'); // P1 Mouse default
+            handleKeyboardInteraction(clickX, clickY, 'player2'); // P2 Mouse default
         });
         
-        // --- Map Pan and Zoom listeners (unchanged) ---
+        document.addEventListener('keydown', (e) => {
+            keysPressed[e.key] = true;
+            // Handle player-specific action keys
+            if (e.key === ' ' || e.code === 'Space') {
+                e.preventDefault();
+                handleKeyboardInteraction(cursors.player1.x, cursors.player1.y, 'player1');
+            }
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                handleKeyboardInteraction(cursors.player2.x, cursors.player2.y, 'player2');
+            }
+        });
+
+        document.addEventListener('keyup', (e) => { keysPressed[e.key] = false; });
+
+        // --- Map Pan and Zoom listeners ---
         function resizeCanvas() { canvas.width = viewport.offsetWidth; canvas.height = viewport.offsetHeight; if (mapImage.complete && naturalWidth > 0) applyConstraintsAndDraw(); }
         mapImage.onload = () => { naturalWidth = mapImage.naturalWidth; naturalHeight = mapImage.naturalHeight; resizeCanvas(); scale = minZoom; panX = (canvas.width - naturalWidth * scale) / 2; panY = (canvas.height - naturalHeight * scale) / 2; applyConstraintsAndDraw(); };
         mapImage.src = imageSrc;
         viewport.addEventListener('wheel', (e) => { e.preventDefault(); const r = canvas.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top; const mapX = (mx - panX) / scale, mapY = (my - panY) / scale; scale = Math.max(minZoom, Math.min(maxZoom, scale - e.deltaY * zoomSensitivity)); panX = mx - mapX * scale; panY = my - mapY * scale; applyConstraintsAndDraw(); });
-        viewport.addEventListener('mousedown', (e) => { if (e.button !== 0 || (e.target !== canvas && e.target !== viewport)) return; mousedownPos = {x:e.clientX, y:e.clientY}; isPanning = true; viewport.classList.add('grabbing'); startPanMouseX = e.clientX; startPanMouseY = e.clientY; initialPanX = panX; initialPanY = panY; e.preventDefault(); });
+        viewport.addEventListener('mousedown', (e) => { if (e.button !== 0 || (e.target !== canvas && e.target !== viewport)) return; viewport.style.cursor = 'grabbing'; mousedownPos = {x:e.clientX, y:e.clientY}; isPanning = true; startPanMouseX = e.clientX; startPanMouseY = e.clientY; initialPanX = panX; initialPanY = panY; e.preventDefault(); });
         document.addEventListener('mousemove', (e) => { if (!isPanning) return; panX = initialPanX + e.clientX - startPanMouseX; panY = initialPanY + e.clientY - startPanMouseY; applyConstraintsAndDraw(); });
-        document.addEventListener('mouseup', (e) => { if (e.button === 0 && isPanning) { isPanning = false; viewport.classList.remove('grabbing'); } });
-        viewport.addEventListener('mouseleave', () => { if (isPanning) { isPanning = false; viewport.classList.remove('grabbing'); } });
+        document.addEventListener('mouseup', (e) => { if (e.button === 0 && isPanning) { viewport.style.cursor = 'grab'; isPanning = false; } });
+        viewport.addEventListener('mouseleave', () => { if (isPanning) { viewport.style.cursor = 'grab'; isPanning = false; } });
         window.addEventListener('resize', resizeCanvas);
 
-        // --- MAIN GAME CLOCK ---
         async function main() {
             while (true) {
                 await new Promise(resolve => setTimeout(resolve, GAME_SPEED_MS));
                 currentGameTime.setHours(currentGameTime.getHours() + 1);
                 timeSpan.innerHTML = currentGameTime.toLocaleString('en-GB');
                 updateGameLogic();
-                drawMap();
             }
         }
+        
+        function renderLoop() {
+            updateCursors();
+            applyConstraintsAndDraw();
+            drawMap();
+            requestAnimationFrame(renderLoop);
+        }
+
         main();
+        renderLoop();
+
     </script>
 </body>
 </html>
